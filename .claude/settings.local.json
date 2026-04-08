@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:opendata.transport.nsw.gov.au)",
+      "WebSearch",
+      "WebFetch(domain:opendataforum.transport.nsw.gov.au)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s \"http://localhost:3001/api/nearby?lat=-33.8688&lng=151.2093\")",
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s \"http://localhost:3001/api/debug\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"http://localhost:3001\")",
+      "Bash(curl -s \"http://localhost:3000\")",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)"
+    ]
+  }
+}
