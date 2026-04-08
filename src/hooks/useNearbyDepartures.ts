@@ -15,6 +15,12 @@ interface Options {
   radius?: number
 }
 
+/**
+ * SWR hook that fetches nearby stops and departures from /api/nearby.
+ * Auto-refreshes every 20 seconds (within TfNSW's ~15 s realtime update window).
+ * Passes null coords to suspend fetching until location is known.
+ * Retains previous data between refreshes to avoid blank flashes.
+ */
 export function useNearbyDepartures({ lat, lng, radius = 500 }: Options) {
   const key =
     lat !== null && lng !== null

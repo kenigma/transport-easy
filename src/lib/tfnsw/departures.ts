@@ -49,7 +49,10 @@ interface RawStopEvent {
 
 /**
  * Gets upcoming departures from a stop using the TfNSW Departure Monitor API.
- * Required parameters: mode=direct, depArrMacro=dep, itdDate, itdTime
+ * Returns departures in the next 90 minutes, excluding those that departed
+ * more than 1 minute ago. Results are limited to `maxDepartures`.
+ *
+ * Uses Sydney local time for itdDate/itdTime (TfNSW API is timezone-sensitive).
  */
 export async function getDepartures(
   stopId: string,

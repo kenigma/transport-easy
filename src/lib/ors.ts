@@ -7,7 +7,14 @@ interface DistanceMatrixResponse {
   }>
 }
 
-/** Returns walk duration in seconds, or null on failure */
+/**
+ * Returns walking duration in seconds between two points using the Google Maps
+ * Distance Matrix API, or null on failure.
+ *
+ * Note: the file is named `ors.ts` for historical reasons (originally used
+ * OpenRouteService). It now calls Google Maps exclusively.
+ * Shared by `/api/walktime` and `/api/trip` (via fixFirstWalkLeg).
+ */
 export async function getWalkSeconds(
   fromLat: number, fromLng: number,
   toLat: number, toLng: number,

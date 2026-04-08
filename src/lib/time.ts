@@ -23,6 +23,10 @@ export function urgencyLevel(minutes: number): UrgencyLevel {
   return 'ok'
 }
 
+/**
+ * Short display string for a countdown: "Departed", "Now", or "X min".
+ * Used in departure rows and urgency badges.
+ */
 export function formatCountdown(minutes: number): string {
   if (minutes < 0) return 'Departed'
   if (minutes === 0) return 'Now'

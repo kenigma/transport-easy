@@ -24,6 +24,15 @@ function persist(trips: FavouriteTrip[]) {
   }
 }
 
+/**
+ * Manages the user's saved trips in localStorage.
+ *
+ * Storage key: `transport-easy:favourite-trips`
+ * Data is per-device — not shared across browsers or users.
+ *
+ * Handles migration for older entries that pre-date the `walkMinutes` and
+ * `lat`/`lng` fields (defaults to 0 if absent).
+ */
 export function useFavouriteTrips() {
   const [trips, setTrips] = useState<FavouriteTrip[]>([])
 

@@ -14,6 +14,11 @@ const MODE_TO_PROVIDER: Partial<Record<TransportMode, string>> = {
   coach:     'coaches',
 }
 
+/**
+ * Returns the TfNSW GTFS Realtime provider name for a given transport mode,
+ * or null if the mode doesn't broadcast vehicle positions.
+ * Trains are intentionally absent — they use EFA-based realtime via departure_mon.
+ */
 export function providerForMode(mode: TransportMode): string | null {
   return MODE_TO_PROVIDER[mode] ?? null
 }

@@ -15,6 +15,18 @@ type GeolocationState =
   | { status: 'denied'; message: string }
   | { status: 'error'; message: string }
 
+/**
+ * Requests the browser's GPS position and tracks permission state.
+ *
+ * States:
+ * - `idle`       — not yet requested (never reached in practice; auto-requests on mount)
+ * - `requesting` — waiting for the browser permission prompt or GPS fix
+ * - `granted`    — position obtained; `coords` contains lat/lng/accuracy
+ * - `denied`     — user denied location permission (prompt or settings)
+ * - `error`      — geolocation unsupported or GPS timeout
+ *
+ * Returns `{ state, retry }` — call `retry()` to request again after denial/error.
+ */
 export function useGeolocation() {
   const [state, setState] = useState<GeolocationState>({ status: 'idle' })
 

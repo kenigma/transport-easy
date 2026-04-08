@@ -144,6 +144,14 @@ function parseJourney(raw: { legs?: RawLeg[] }): Journey | null {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/**
+ * Produces a stable string identifier for a journey based on its transit legs,
+ * e.g. `"train:T4|bus:380"`. Independent of departure time, so the same route
+ * taken at different times produces the same fingerprint.
+ *
+ * Used as a cache key for timetable lookups and to deduplicate route options
+ * discovered across multiple time-slot queries.
+ */
 export function journeyFingerprint(journey: Journey): string {
   return journey.legs
     .filter((l) => !l.isWalk)
@@ -151,6 +159,15 @@ export function journeyFingerprint(journey: Journey): string {
     .join('|')
 }
 
+/**
+ * Fetches journey options between two coordinates from the TfNSW Trip Planner API.
+ *
+ * Known limitation: the TfNSW /tp/trip endpoint does not return Metro routes for
+ * some CBD corridors (e.g. Central → Chatswood). Use supplemental stop-ID-based
+ * queries via `extraParams` to force Metro route discovery for affected corridors.
+ *
+ * @param extraParams - Optional overrides (e.g. type_origin/name_origin for stop-ID routing)
+ */
 export async function getTrip(
   originLat: number,
   originLng: number,
