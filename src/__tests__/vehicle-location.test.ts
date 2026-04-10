@@ -108,10 +108,15 @@ describe('filterAndSortVehicles', () => {
     expect(result).toHaveLength(0)
   })
 
-  it('matching is case-insensitive', () => {
-    const result = filterAndSortVehicles(vehicles, '380', stop.lat, stop.lng)
-    const resultLower = filterAndSortVehicles(vehicles, '380', stop.lat, stop.lng)
-    expect(result.length).toBe(resultLower.length)
+  it('matching is case-insensitive for alphabetic route IDs', () => {
+    const mixedCaseVehicles: VehiclePosition[] = [
+      makeVehicle('a1', 'sydneytrains_T4', -33.87, 151.21),
+      makeVehicle('a2', 'sydneytrains_t4', -33.88, 151.22),  // lowercase variant
+    ]
+    const upper = filterAndSortVehicles(mixedCaseVehicles, 'T4', stop.lat, stop.lng)
+    const lower = filterAndSortVehicles(mixedCaseVehicles, 't4', stop.lat, stop.lng)
+    expect(upper.length).toBe(lower.length)
+    expect(upper.length).toBeGreaterThan(0)
   })
 
   it('treats "T1" route IDs correctly (train route format)', () => {

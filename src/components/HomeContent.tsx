@@ -22,9 +22,16 @@ export function HomeContent() {
   const { trips } = useFavouriteTrips()
   const hasFavourites = trips.length > 0
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(
-    hasFavourites ? 'mytrips' : 'nearby'
-  )
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    if (typeof window === 'undefined') return 'nearby'
+    try {
+      const raw = localStorage.getItem('transport-easy:favourite-trips')
+      const parsed: unknown[] = raw ? JSON.parse(raw) : []
+      return parsed.length > 0 ? 'mytrips' : 'nearby'
+    } catch {
+      return 'nearby'
+    }
+  })
 
   return (
     <div className="space-y-4">

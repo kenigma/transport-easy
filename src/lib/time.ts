@@ -85,6 +85,18 @@ export function getSydneyItdParams(now: Date): { itdDate: string; itdTime: strin
 }
 
 /**
+ * Formats an ISO 8601 time string as a short Sydney local clock time, e.g. "8:32 am".
+ */
+export function formatClockTime(isoTime: string): string {
+  return new Date(isoTime).toLocaleTimeString('en-AU', {
+    timeZone: 'Australia/Sydney',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+/**
  * Returns the effective departure time for a departure:
  * estimated if available, otherwise scheduled.
  */

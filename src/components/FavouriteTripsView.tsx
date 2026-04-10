@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import type { FavouriteTrip, Departure } from '@/lib/types'
 import {
-  minutesUntil, effectiveTime, formatCountdown,
+  minutesUntil, effectiveTime, formatCountdown, formatClockTime,
   isReachable, urgencyWithWalk, humanMessage,
 } from '@/lib/time'
 import { useCountdown } from '@/hooks/useCountdown'
@@ -58,7 +58,7 @@ function WalkTimePicker({ currentMins, onSelect, onClose }: {
   )
 }
 
-function FavouriteTripCard({ trip }: { trip: FavouriteTrip }) {
+function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip; onPrimaryMinsChange?: (id: string, mins: number | null) => void }) {
   useCountdown(10_000)
   const [editingWalk, setEditingWalk] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
@@ -82,6 +82,12 @@ function FavouriteTripCard({ trip }: { trip: FavouriteTrip }) {
   const primaryMins = primary ? minutesUntil(effectiveTime(primary)) : null
   const primaryLevel = primaryMins !== null ? urgencyWithWalk(primaryMins, walkMins) : 'departed'
   const primaryMessage = primaryMins !== null ? humanMessage(primaryMins, walkMins) : null
+
+  useEffect(() => {
+    if (!isLoading && onPrimaryMinsChange) {
+      onPrimaryMinsChange(trip.id, primaryMins)
+    }
+  }, [primaryMins, isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -185,7 +191,8 @@ function FavouriteTripCard({ trip }: { trip: FavouriteTrip }) {
               {primaryMessage}
             </span>
             <div className="text-sm text-gray-600">
-              Departs in <span className="font-semibold text-gray-900">{formatCountdown(primaryMins!)}</span>
+              <span className="font-semibold text-gray-900">{formatCountdown(primaryMins!)}</span>
+              <span className="text-gray-400 ml-1">· {formatClockTime(effectiveTime(primary))}</span>
             </div>
           </div>
         )}
@@ -196,7 +203,7 @@ function FavouriteTripCard({ trip }: { trip: FavouriteTrip }) {
               const mins = minutesUntil(effectiveTime(dep))
               return (
                 <span key={`${dep.scheduledDepartureTime}-${i}`} className="text-xs text-gray-400">
-                  {i === 0 ? 'Then' : '·'} {formatCountdown(mins)}
+                  {i === 0 ? 'Then' : '·'} {formatCountdown(mins)} · {formatClockTime(effectiveTime(dep))}
                 </span>
               )
             })}
@@ -212,12 +219,22 @@ interface Props {
 }
 
 export function FavouriteTripsView({ trips }: Props) {
+  const [sortKeys, setSortKeys] = useState<Record<string, number>>({})
+
+  const handlePrimaryMins = useCallback((id: string, mins: number | null) => {
+    setSortKeys((prev) => ({ ...prev, [id]: mins ?? Infinity }))
+  }, [])
+
   if (trips.length === 0) return null
+
+  const sorted = [...trips].sort((a, b) => {
+    return (sortKeys[a.id] ?? Infinity) - (sortKeys[b.id] ?? Infinity)
+  })
 
   return (
     <div className="space-y-4">
-      {trips.map((trip) => (
-        <FavouriteTripCard key={trip.id} trip={trip} />
+      {sorted.map((trip) => (
+        <FavouriteTripCard key={trip.id} trip={trip} onPrimaryMinsChange={handlePrimaryMins} />
       ))}
     </div>
   )
