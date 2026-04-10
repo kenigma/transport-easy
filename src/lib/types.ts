@@ -52,6 +52,7 @@ export interface FavouriteTrip {
   walkMinutes: number  // minutes to walk to stop; 0 = no preference
   lat: number
   lng: number
+  travelMinutes: number | null  // scheduled travel time from stop to destination; null if unknown
 }
 
 // ── Trip Planner ──────────────────────────────────────────────────────────────

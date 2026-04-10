@@ -10,7 +10,7 @@ function load(): FavouriteTrip[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed: FavouriteTrip[] = raw ? JSON.parse(raw) : []
     // Migrate old entries that don't have walkMinutes
-    return parsed.map((t) => ({ ...t, walkMinutes: t.walkMinutes ?? 0, lat: t.lat ?? 0, lng: t.lng ?? 0 }))
+    return parsed.map((t) => ({ ...t, walkMinutes: t.walkMinutes ?? 0, lat: t.lat ?? 0, lng: t.lng ?? 0, travelMinutes: t.travelMinutes ?? null }))
   } catch {
     return []
   }

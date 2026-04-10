@@ -54,6 +54,15 @@ export function LegRow({ leg }: Props) {
     if (saved) {
       remove(tripId)
     } else {
+      const travelMinutes =
+        leg.originDeparturePlanned && leg.destinationArrivalPlanned
+          ? Math.round(
+              (new Date(leg.destinationArrivalPlanned).getTime() -
+                new Date(leg.originDeparturePlanned).getTime()) /
+                60_000
+            )
+          : null
+
       add({
         id: tripId,
         stopId: leg.stopId,
@@ -65,6 +74,7 @@ export function LegRow({ leg }: Props) {
         walkMinutes: 0,
         lat: leg.stopLat ?? 0,
         lng: leg.stopLng ?? 0,
+        travelMinutes,
       })
     }
   }

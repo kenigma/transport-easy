@@ -87,6 +87,7 @@ export function DepartureRow({ departure, stopId, stopName, stopLat, stopLng }: 
       walkMinutes: mins,
       lat: stopLat,
       lng: stopLng,
+      travelMinutes: null,
     })
     setShowWalkPicker(false)
     setWalkEstimate(null)

@@ -193,6 +193,11 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
             <div className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{formatCountdown(primaryMins!)}</span>
               <span className="text-gray-400 ml-1">· {formatClockTime(effectiveTime(primary))}</span>
+              {trip.travelMinutes != null && (
+                <span className="text-gray-400 ml-1">
+                  → {formatClockTime(new Date(new Date(effectiveTime(primary)).getTime() + trip.travelMinutes * 60_000).toISOString())}
+                </span>
+              )}
             </div>
           </div>
         )}

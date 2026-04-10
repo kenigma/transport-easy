@@ -90,6 +90,14 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Prop
           walkMinutes,
           lat: firstTransitLeg.stopLat ?? 0,
           lng: firstTransitLeg.stopLng ?? 0,
+          travelMinutes:
+            firstTransitLeg.originDeparturePlanned && firstTransitLeg.destinationArrivalPlanned
+              ? Math.round(
+                  (new Date(firstTransitLeg.destinationArrivalPlanned).getTime() -
+                    new Date(firstTransitLeg.originDeparturePlanned).getTime()) /
+                    60_000
+                )
+              : null,
         }
       : null
 
