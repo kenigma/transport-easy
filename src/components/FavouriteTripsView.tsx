@@ -66,6 +66,7 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
   useCountdown(10_000)
   const [editingWalk, setEditingWalk] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
 
   const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&serviceId=${encodeURIComponent(trip.serviceId)}&destination=${encodeURIComponent(trip.destination)}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
@@ -149,13 +150,30 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
                 📍
               </a>
             ) : null}
-            <button
-              onClick={() => onRemove(trip.id)}
-              className="text-tfnsw-blue text-base p-1"
-              aria-label="Remove from favourites"
-            >
-              ★
-            </button>
+            {confirmingRemove ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onRemove(trip.id)}
+                  className="text-xs font-medium text-white bg-red-500 rounded-full px-2 py-0.5"
+                >
+                  Remove
+                </button>
+                <button
+                  onClick={() => setConfirmingRemove(false)}
+                  className="text-xs text-gray-400 px-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingRemove(true)}
+                className="text-tfnsw-blue text-base p-1"
+                aria-label="Remove from favourites"
+              >
+                ★
+              </button>
+            )}
           </div>
         </div>
 
