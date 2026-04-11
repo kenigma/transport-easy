@@ -53,6 +53,7 @@ export interface FavouriteTrip {
   lat: number
   lng: number
   travelMinutes: number | null  // scheduled travel time from stop to destination; null if unknown
+  userDestination: string | null  // user's actual alighting stop; null when destination already is their stop
 }
 
 // ── Trip Planner ──────────────────────────────────────────────────────────────

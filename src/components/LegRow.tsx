@@ -75,6 +75,7 @@ export function LegRow({ leg }: Props) {
         lat: leg.stopLat ?? 0,
         lng: leg.stopLng ?? 0,
         travelMinutes,
+        userDestination: leg.legDestination ? leg.destinationName : null,
       })
     }
   }

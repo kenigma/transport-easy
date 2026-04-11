@@ -83,6 +83,22 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
   const primaryLevel = primaryMins !== null ? urgencyWithWalk(primaryMins, walkMins) : 'departed'
   const primaryMessage = primaryMins !== null ? humanMessage(primaryMins, walkMins) : null
 
+  const onBoard = (() => {
+    if (!trip.travelMinutes) return null
+    const candidates = allDepartures.filter((dep) => {
+      if (dep.isCancelled) return false
+      const mins = minutesUntil(effectiveTime(dep))
+      return mins < 0 && Math.abs(mins) < trip.travelMinutes!
+    })
+    if (candidates.length === 0) return null
+    candidates.sort((a, b) => minutesUntil(effectiveTime(b)) - minutesUntil(effectiveTime(a)))
+    return candidates[0]
+  })()
+
+  const onBoardArrival = onBoard
+    ? new Date(new Date(effectiveTime(onBoard)).getTime() + trip.travelMinutes! * 60_000).toISOString()
+    : null
+
   useEffect(() => {
     if (!isLoading && onPrimaryMinsChange) {
       onPrimaryMinsChange(trip.id, primaryMins)
@@ -99,10 +115,13 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
               {MODE_EMOJI[trip.mode] ?? '🚌'} {trip.stopName}
             </p>
             <h2 className="text-base font-semibold text-gray-900 leading-snug">
-              {trip.serviceId} → {trip.destination}
+              {trip.serviceId} → {trip.userDestination ?? trip.destination}
             </h2>
             {trip.lineName && (
               <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
+            )}
+            {trip.userDestination && (
+              <p className="text-xs text-gray-400 mt-0.5 truncate">via {trip.destination} service</p>
             )}
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -179,7 +198,7 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
           <p className="pt-3 text-sm text-gray-400">Could not load departures.</p>
         )}
 
-        {!isLoading && !error && primary === null && (
+        {!isLoading && !error && primary === null && onBoard === null && (
           <p className="pt-3 text-sm text-gray-400">
             No reachable services right now.
           </p>
@@ -212,6 +231,15 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
                 </span>
               )
             })}
+          </div>
+        )}
+
+        {onBoard && onBoardArrival && (
+          <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
+            <span className="text-base">🚉</span>
+            <p className="text-sm text-blue-700 font-medium">
+              On board · arrives {trip.userDestination ?? trip.destination} {formatClockTime(onBoardArrival)}
+            </p>
           </div>
         )}
       </div>

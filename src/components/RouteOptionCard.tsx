@@ -98,6 +98,7 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Prop
                     60_000
                 )
               : null,
+          userDestination: firstTransitLeg.legDestination ? firstTransitLeg.destinationName : null,
         }
       : null
 
