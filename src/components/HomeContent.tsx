@@ -19,7 +19,7 @@ function tabClass(active: boolean): string {
 
 export function HomeContent() {
   const [manualLocation, setManualLocation] = useState<GeocodeResult | null>(null)
-  const { trips } = useFavouriteTrips()
+  const { trips, remove, updateWalkTime } = useFavouriteTrips()
   const hasFavourites = trips.length > 0
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -69,7 +69,7 @@ export function HomeContent() {
 
               {/* My Trips */}
               {activeTab === 'mytrips' && hasFavourites && (
-                <FavouriteTripsView trips={trips} />
+                <FavouriteTripsView trips={trips} onRemove={remove} onUpdateWalkTime={updateWalkTime} />
               )}
 
               {/* Nearby */}

@@ -8,7 +8,6 @@ import {
   isReachable, urgencyWithWalk, humanMessage,
 } from '@/lib/time'
 import { useCountdown } from '@/hooks/useCountdown'
-import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
 import { VehicleMap } from './VehicleMap'
 
 const MODE_EMOJI: Record<string, string> = {
@@ -58,11 +57,15 @@ function WalkTimePicker({ currentMins, onSelect, onClose }: {
   )
 }
 
-function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip; onPrimaryMinsChange?: (id: string, mins: number | null) => void }) {
+function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChange }: {
+  trip: FavouriteTrip
+  onRemove: (id: string) => void
+  onUpdateWalkTime: (id: string, mins: number) => void
+  onPrimaryMinsChange?: (id: string, mins: number | null) => void
+}) {
   useCountdown(10_000)
   const [editingWalk, setEditingWalk] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
-  const { updateWalkTime, remove } = useFavouriteTrips()
 
   const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&serviceId=${encodeURIComponent(trip.serviceId)}&destination=${encodeURIComponent(trip.destination)}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
@@ -147,8 +150,8 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
               </a>
             ) : null}
             <button
-              onClick={() => remove(trip.id)}
-              className="text-gray-300 text-base p-1"
+              onClick={() => onRemove(trip.id)}
+              className="text-tfnsw-blue text-base p-1"
               aria-label="Remove from favourites"
             >
               ★
@@ -167,7 +170,7 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
         {editingWalk && (
           <WalkTimePicker
             currentMins={walkMins}
-            onSelect={(mins) => { updateWalkTime(trip.id, mins); setEditingWalk(false) }}
+            onSelect={(mins) => { onUpdateWalkTime(trip.id, mins); setEditingWalk(false) }}
             onClose={() => setEditingWalk(false)}
           />
         )}
@@ -249,9 +252,11 @@ function FavouriteTripCard({ trip, onPrimaryMinsChange }: { trip: FavouriteTrip;
 
 interface Props {
   trips: FavouriteTrip[]
+  onRemove: (id: string) => void
+  onUpdateWalkTime: (id: string, mins: number) => void
 }
 
-export function FavouriteTripsView({ trips }: Props) {
+export function FavouriteTripsView({ trips, onRemove, onUpdateWalkTime }: Props) {
   const [sortKeys, setSortKeys] = useState<Record<string, number>>({})
 
   const handlePrimaryMins = useCallback((id: string, mins: number | null) => {
@@ -267,7 +272,7 @@ export function FavouriteTripsView({ trips }: Props) {
   return (
     <div className="space-y-4">
       {sorted.map((trip) => (
-        <FavouriteTripCard key={trip.id} trip={trip} onPrimaryMinsChange={handlePrimaryMins} />
+        <FavouriteTripCard key={trip.id} trip={trip} onRemove={onRemove} onUpdateWalkTime={onUpdateWalkTime} onPrimaryMinsChange={handlePrimaryMins} />
       ))}
     </div>
   )
