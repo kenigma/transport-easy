@@ -56,7 +56,8 @@ interface RawStopEvent {
  */
 export async function getDepartures(
   stopId: string,
-  maxDepartures = 5
+  maxDepartures = 5,
+  maxPastMinutes = 1
 ): Promise<Departure[]> {
   const now = new Date()
   const { itdDate, itdTime } = getSydneyItdParams(now)
@@ -83,7 +84,7 @@ export async function getDepartures(
       const t = e.departureTimeEstimated ?? e.departureTimePlanned
       if (!t) return false
       const diffMin = (new Date(t).getTime() - nowMs) / 60_000
-      return diffMin > -1 && diffMin < 90
+      return diffMin > -maxPastMinutes && diffMin < 90
     })
     .slice(0, maxDepartures)
     .map((e): Departure => {

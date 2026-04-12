@@ -68,7 +68,8 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
   const [showVehicleMap, setShowVehicleMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
 
-  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&serviceId=${encodeURIComponent(trip.serviceId)}&destination=${encodeURIComponent(trip.destination)}`
+  const maxPastMinutes = trip.travelMinutes ?? 1
+  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&serviceId=${encodeURIComponent(trip.serviceId)}&destination=${encodeURIComponent(trip.destination)}&maxPastMinutes=${maxPastMinutes}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
 
   const walkMins = trip.walkMinutes ?? 0

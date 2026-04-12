@@ -17,18 +17,19 @@ export async function GET(req: NextRequest) {
   const stopId = searchParams.get('stopId')?.trim()
   const serviceId = searchParams.get('serviceId')?.trim() ?? null
   const destination = searchParams.get('destination')?.trim() ?? null
+  const maxPastMinutes = Math.min(Math.max(parseInt(searchParams.get('maxPastMinutes') ?? '1'), 1), 90)
 
   if (!stopId) {
     return NextResponse.json({ error: 'stopId is required' }, { status: 400 })
   }
 
-  // Cache full departure list per stop (filters applied after cache hit)
-  const cacheKey = `departures:${stopId}`
+  // Cache key includes maxPastMinutes — a wider lookback is a different dataset
+  const cacheKey = `departures:${stopId}:past${maxPastMinutes}`
   let departures = cacheGet<Departure[]>(cacheKey)
 
   if (!departures) {
     try {
-      departures = await getDepartures(stopId, 40)
+      departures = await getDepartures(stopId, 40, maxPastMinutes)
       cacheSet(cacheKey, departures, CACHE_TTL_MS)
     } catch (err) {
       console.error('[/api/departures]', err)
