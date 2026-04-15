@@ -145,6 +145,7 @@ export async function GET(req: NextRequest) {
       if (!fp) continue
       if (!grouped.has(fp)) grouped.set(fp, j)
     }
+    console.log('[trip-options] distinct fingerprints:', Array.from(grouped.keys()))
 
     // Fix walk legs and build RouteOption for each pattern
     const options: RouteOption[] = await Promise.all(

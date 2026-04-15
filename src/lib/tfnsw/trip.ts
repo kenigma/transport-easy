@@ -152,15 +152,32 @@ function parseJourney(raw: { legs?: RawLeg[] }): Journey | null {
  * Used as a cache key for timetable lookups and to deduplicate route options
  * discovered across multiple time-slot queries.
  */
+/** Strip ", Suburb" suffix that TfNSW sometimes appends to stop names. */
+function normalizeStopName(name: string): string {
+  const idx = name.lastIndexOf(', ')
+  if (idx === -1) return name
+  const suffix = name.slice(idx + 2)
+  // Only strip if suffix looks like a suburb (letters/spaces only, no digits)
+  return /^[A-Za-z\s]+$/.test(suffix) ? name.slice(0, idx) : name
+}
+
 /**
  * Produces a stable corridor fingerprint based on mode + origin + destination
  * for each transit leg. All services (T1, T9, CCN) serving the same corridor
  * share one fingerprint, so they appear as one route option in the UI.
+ *
+ * Uses stopId for origin (consistent across query types) and normalized name
+ * for destination (strips "Station, Suburb" → "Station" to handle coord-based
+ * vs stop-based API responses returning different name formats).
  */
 export function journeyFingerprint(journey: Journey): string {
   return journey.legs
     .filter((l) => !l.isWalk)
-    .map((l) => `${l.mode}:${l.originName}:${l.destinationName}`)
+    .map((l) => {
+      const origin = l.stopId ?? normalizeStopName(l.originName)
+      const dest = normalizeStopName(l.destinationName)
+      return `${l.mode}:${origin}:${dest}`
+    })
     .join('|')
 }
 
