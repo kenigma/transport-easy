@@ -39,13 +39,17 @@ const MODE_LABEL: Record<string, string> = {
   train: 'Train', metro: 'Metro', bus: 'Bus', ferry: 'Ferry', lightrail: 'Light Rail', coach: 'Coach', unknown: 'Service',
 }
 
-function buildRouteLabel(journey: Journey): string {
+function buildRouteLabel(journey: Journey, serviceIdsByLegIdx: Map<number, string[]>): string {
   const transitLegs = journey.legs.filter((l) => !l.isWalk)
-  // Use mode name (not serviceId) — multiple lines serving the same corridor share one card
   const seen = new Set<string>()
   return transitLegs
     .filter((l) => { const key = l.mode ?? 'unknown'; if (seen.has(key)) return false; seen.add(key); return true })
-    .map((l) => `${MODE_EMOJI[l.mode ?? 'unknown'] ?? '🚌'} ${MODE_LABEL[l.mode ?? 'unknown'] ?? 'Service'}`)
+    .map((l, i) => {
+      const emoji = MODE_EMOJI[l.mode ?? 'unknown'] ?? '🚌'
+      const ids = serviceIdsByLegIdx.get(i)
+      const suffix = ids && ids.length > 0 ? ids.sort().join(' · ') : (MODE_LABEL[l.mode ?? 'unknown'] ?? 'Service')
+      return `${emoji} ${suffix}`
+    })
     .join(' → ')
 }
 
@@ -139,18 +143,32 @@ export async function GET(req: NextRequest) {
     }
 
     // Group by fingerprint — keep the first (earliest time) journey per pattern
-    const grouped = new Map<string, Journey>()
+    // and collect all distinct serviceIds per transit-leg index across journeys
+    const grouped = new Map<string, { journey: Journey; serviceIdsByLegIdx: Map<number, Set<string>> }>()
     for (const j of allJourneys) {
       const fp = journeyFingerprint(j)
       if (!fp) continue
-      if (!grouped.has(fp)) grouped.set(fp, j)
+      const transitLegs = j.legs.filter((l) => !l.isWalk)
+      if (!grouped.has(fp)) {
+        const serviceIdsByLegIdx = new Map<number, Set<string>>()
+        transitLegs.forEach((l, i) => { if (l.serviceId) serviceIdsByLegIdx.set(i, new Set([l.serviceId])) })
+        grouped.set(fp, { journey: j, serviceIdsByLegIdx })
+      } else {
+        const entry = grouped.get(fp)!
+        transitLegs.forEach((l, i) => {
+          if (!l.serviceId) return
+          if (!entry.serviceIdsByLegIdx.has(i)) entry.serviceIdsByLegIdx.set(i, new Set())
+          entry.serviceIdsByLegIdx.get(i)!.add(l.serviceId)
+        })
+      }
     }
     console.log('[trip-options] distinct fingerprints:', Array.from(grouped.keys()))
 
     // Fix walk legs and build RouteOption for each pattern
     const options: RouteOption[] = await Promise.all(
-      Array.from(grouped.entries()).map(async ([fingerprint, journey]) => {
+      Array.from(grouped.entries()).map(async ([fingerprint, { journey, serviceIdsByLegIdx }]) => {
         const fixed = await fixFirstWalkLeg(journey, fromLat, fromLng)
+        const serviceIdArraysByLegIdx = new Map(Array.from(serviceIdsByLegIdx.entries()).map(([i, s]) => [i, Array.from(s)]))
         const transitLegs = fixed.legs.filter((l) => !l.isWalk)
         const modeSet = new Set(
           transitLegs.map((l) => l.mode).filter((m): m is TransportMode => m !== null)
@@ -158,7 +176,7 @@ export async function GET(req: NextRequest) {
         const modes = Array.from(modeSet)
         return {
           fingerprint,
-          label: buildRouteLabel(fixed),
+          label: buildRouteLabel(fixed, serviceIdArraysByLegIdx),
           modes,
           transfers: fixed.transfers,
           typicalDurationSeconds: fixed.totalDurationSeconds,
