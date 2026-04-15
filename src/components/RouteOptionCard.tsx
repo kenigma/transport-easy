@@ -221,8 +221,8 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromSt
 
                     {isEntryExpanded && (
                       <div className="px-4 pb-3">
-                        {entry.journey.legs.map((leg, li) => (
-                          <LegRow key={li} leg={leg} fromStopId={!leg.isWalk ? fromStopId : undefined} />
+                        {entry.journey.legs.filter((leg) => !leg.isWalk).map((leg, li) => (
+                          <LegRow key={li} leg={leg} fromStopId={fromStopId} />
                         ))}
                       </div>
                     )}
