@@ -88,8 +88,8 @@ describe.skipIf(!hasApiKey)('Route discovery pipeline: 1 Farrer Pl Sydney → Ch
     expect(slotJourneys.length, 'Expected at least some journeys from time-slot queries').toBeGreaterThan(0)
     expect(slotFingerprints.size, 'Expected at least one distinct route fingerprint').toBeGreaterThan(0)
 
-    // 2. T1 train should be found (it's the primary option for this route)
-    const hasTrain = Array.from(slotFingerprints).some(fp => fp.includes('train:T1'))
+    // 2. A train route should be found (corridor fingerprint no longer includes serviceId)
+    const hasTrain = Array.from(slotFingerprints).some(fp => fp.startsWith('train:'))
     expect(hasTrain, 'Expected T1 train to appear as a route option').toBe(true)
 
     // 3. Nearby stop discovery should find Metro stops (Martin Place, Barangaroo)

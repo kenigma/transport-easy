@@ -43,7 +43,7 @@ export function LegRow({ leg }: Props) {
   }
 
   const tripId = leg.stopId
-    ? `${leg.stopId}:${leg.legDestination ?? leg.destinationName}`
+    ? `${leg.stopId}:${leg.destinationName}`
     : null
   const saved = tripId ? isFavourite(tripId) : false
   const emoji = MODE_EMOJI[leg.mode ?? 'unknown'] ?? '🚌'
@@ -69,13 +69,13 @@ export function LegRow({ leg }: Props) {
         stopName: leg.originName,
         serviceId: leg.serviceId!,
         lineName: leg.lineName,
-        destination: leg.legDestination ?? leg.destinationName,
+        destination: leg.destinationName,
         mode: leg.mode ?? 'unknown',
         walkMinutes: 0,
         lat: leg.stopLat ?? 0,
         lng: leg.stopLng ?? 0,
         travelMinutes,
-        userDestination: leg.legDestination ? leg.destinationName : null,
+        userDestination: null,
       })
     }
   }

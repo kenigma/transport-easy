@@ -152,10 +152,15 @@ function parseJourney(raw: { legs?: RawLeg[] }): Journey | null {
  * Used as a cache key for timetable lookups and to deduplicate route options
  * discovered across multiple time-slot queries.
  */
+/**
+ * Produces a stable corridor fingerprint based on mode + origin + destination
+ * for each transit leg. All services (T1, T9, CCN) serving the same corridor
+ * share one fingerprint, so they appear as one route option in the UI.
+ */
 export function journeyFingerprint(journey: Journey): string {
   return journey.legs
     .filter((l) => !l.isWalk)
-    .map((l) => `${l.mode}:${l.serviceId}`)
+    .map((l) => `${l.mode}:${l.originName}:${l.destinationName}`)
     .join('|')
 }
 

@@ -35,10 +35,17 @@ function sydneyDateAtHour(hour: number): Date {
   return new Date(Date.UTC(y, m - 1, d, hour, 0, 0) - offsetMin * 60 * 1000)
 }
 
+const MODE_LABEL: Record<string, string> = {
+  train: 'Train', metro: 'Metro', bus: 'Bus', ferry: 'Ferry', lightrail: 'Light Rail', coach: 'Coach', unknown: 'Service',
+}
+
 function buildRouteLabel(journey: Journey): string {
   const transitLegs = journey.legs.filter((l) => !l.isWalk)
+  // Use mode name (not serviceId) — multiple lines serving the same corridor share one card
+  const seen = new Set<string>()
   return transitLegs
-    .map((l) => `${MODE_EMOJI[l.mode ?? 'unknown'] ?? '🚌'} ${l.serviceId ?? ''}`)
+    .filter((l) => { const key = l.mode ?? 'unknown'; if (seen.has(key)) return false; seen.add(key); return true })
+    .map((l) => `${MODE_EMOJI[l.mode ?? 'unknown'] ?? '🚌'} ${MODE_LABEL[l.mode ?? 'unknown'] ?? 'Service'}`)
     .join(' → ')
 }
 

@@ -52,7 +52,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   }, [gpsLat, gpsLng, trip.lat, trip.lng])
 
   const maxPastMinutes = trip.travelMinutes ?? 1
-  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&destination=${encodeURIComponent(trip.destination)}&maxPastMinutes=${maxPastMinutes}`
+  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&maxPastMinutes=${maxPastMinutes}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
 
   const allDepartures = data?.departures ?? []
