@@ -22,9 +22,10 @@ function formatWalkDuration(seconds: number): string {
 
 interface Props {
   leg: TripLeg
+  fromStopId?: string  // station-level stop ID to use instead of platform-level leg.stopId
 }
 
-export function LegRow({ leg }: Props) {
+export function LegRow({ leg, fromStopId }: Props) {
   const { isFavourite, add, remove } = useFavouriteTrips()
 
   if (leg.isWalk) {
@@ -42,8 +43,10 @@ export function LegRow({ leg }: Props) {
     )
   }
 
-  const tripId = leg.stopId
-    ? `${leg.stopId}:${leg.destinationName}`
+  // Use station-level stopId (from stop-search) when available; fall back to leg's platform-level stopId
+  const effectiveStopId = fromStopId ?? leg.stopId
+  const tripId = effectiveStopId
+    ? `${effectiveStopId}:${leg.destinationName}`
     : null
   const saved = tripId ? isFavourite(tripId) : false
   const emoji = MODE_EMOJI[leg.mode ?? 'unknown'] ?? '🚌'
@@ -53,7 +56,7 @@ export function LegRow({ leg }: Props) {
     if (!tripId || !leg.stopId) return
     if (saved) {
       remove(tripId)
-    } else {
+    } else if (effectiveStopId) {
       const travelMinutes =
         leg.originDeparturePlanned && leg.destinationArrivalPlanned
           ? Math.round(
@@ -65,7 +68,7 @@ export function LegRow({ leg }: Props) {
 
       add({
         id: tripId,
-        stopId: leg.stopId,
+        stopId: effectiveStopId,
         stopName: leg.originName,
         serviceId: leg.serviceId!,
         lineName: leg.lineName,

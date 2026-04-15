@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { FavouriteTrip } from '@/lib/types'
 
 const STORAGE_KEY = 'transport-easy:favourite-trips'
+const SYNC_EVENT = 'favourite-trips-changed'
 
 function load(): FavouriteTrip[] {
   try {
@@ -26,6 +27,8 @@ function load(): FavouriteTrip[] {
 function persist(trips: FavouriteTrip[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trips))
+    // Notify all other hook instances on this page to reload
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT))
   } catch {
     // ignore
   }
@@ -34,22 +37,19 @@ function persist(trips: FavouriteTrip[]) {
 /**
  * Manages the user's saved trips in localStorage.
  *
- * Storage key: `transport-easy:favourite-trips`
- * Data is per-device — not shared across browsers or users.
+ * All instances of this hook on the same page share state via a custom DOM
+ * event. When any instance writes to localStorage, all others reload.
  *
- * Handles migration for older entries that pre-date the `walkMinutes` and
- * `lat`/`lng` fields (defaults to 0 if absent).
+ * Storage key: `transport-easy:favourite-trips`
  */
 export function useFavouriteTrips() {
   const [trips, setTrips] = useState<FavouriteTrip[]>([])
 
   useEffect(() => {
     setTrips(load())
-  }, [])
-
-  const save = useCallback((next: FavouriteTrip[]) => {
-    setTrips(next)
-    persist(next)
+    const handler = () => setTrips(load())
+    window.addEventListener(SYNC_EVENT, handler)
+    return () => window.removeEventListener(SYNC_EVENT, handler)
   }, [])
 
   const add = useCallback((trip: FavouriteTrip) => {
@@ -88,5 +88,5 @@ export function useFavouriteTrips() {
 
   const isFavourite = useCallback((id: string) => trips.some((t) => t.id === id), [trips])
 
-  return { trips, add, remove, toggle, isFavourite, save, updateWalkTime }
+  return { trips, add, remove, toggle, isFavourite, updateWalkTime }
 }

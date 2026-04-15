@@ -268,6 +268,7 @@ export function TripPlanner({ gpsCoords }: Props) {
               fromLng={fromCoords.lng}
               toLat={toLocation!.lat}
               toLng={toLocation!.lng}
+              fromStopId={fromLocation?.stopId}
             />
           ))}
         </div>

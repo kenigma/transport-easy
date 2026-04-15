@@ -59,9 +59,10 @@ interface Props {
   fromLng: number
   toLat: number
   toLng: number
+  fromStopId?: string  // station-level stop ID for saving favourites
 }
 
-export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Props) {
+export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromStopId }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [expandedEntryIdx, setExpandedEntryIdx] = useState<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => todaySydney())
@@ -74,14 +75,16 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Prop
   const walkMinutes = firstWalkLeg
     ? Math.round((firstWalkLeg.walkDurationSeconds ?? firstWalkLeg.durationSeconds) / 60)
     : 0
-  const tripId = firstTransitLeg?.stopId
-    ? `${firstTransitLeg.stopId}:${firstTransitLeg.destinationName}`
+  // Use station-level stopId for deduplication and departure fetching
+  const effectiveStopId = fromStopId ?? firstTransitLeg?.stopId ?? null
+  const tripId = effectiveStopId && firstTransitLeg
+    ? `${effectiveStopId}:${firstTransitLeg.destinationName}`
     : null
   const favouriteTrip: FavouriteTrip | null =
-    tripId && firstTransitLeg?.stopId
+    tripId && effectiveStopId && firstTransitLeg
       ? {
           id: tripId,
-          stopId: firstTransitLeg.stopId,
+          stopId: effectiveStopId,
           stopName: firstTransitLeg.originName,
           serviceId: firstTransitLeg.serviceId!,
           lineName: firstTransitLeg.lineName,
@@ -217,7 +220,7 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Prop
                     {isEntryExpanded && (
                       <div className="px-4 pb-3">
                         {entry.journey.legs.map((leg, li) => (
-                          <LegRow key={li} leg={leg} />
+                          <LegRow key={li} leg={leg} fromStopId={!leg.isWalk ? fromStopId : undefined} />
                         ))}
                       </div>
                     )}

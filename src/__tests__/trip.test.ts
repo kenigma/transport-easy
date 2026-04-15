@@ -102,13 +102,6 @@ describe('journeyFingerprint', () => {
     expect(journeyFingerprint(journey)).toBe('train:Central:Bondi Junction')
   })
 
-  it('uses stopId for origin when available', () => {
-    const journey = makeJourney([
-      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central Station, Sydney', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bondi Junction', destinationArrivalPlanned: null, stopId: '200060', stopLat: null, stopLng: null, legDestination: null },
-    ])
-    expect(journeyFingerprint(journey)).toBe('train:200060:Bondi Junction')
-  })
-
   it('strips suburb suffix from stop names', () => {
     const journey = makeJourney([
       { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central Station, Sydney', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Chatswood Station, Chatswood', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
