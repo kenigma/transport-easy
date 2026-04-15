@@ -19,6 +19,7 @@ export function NearbyDepartures({ lat, lng }: Props) {
 
   const { data, error, isLoading, refresh } = useNearbyDepartures({ lat, lng })
 
+  const seenRoutes = new Set<string>()
   const stops = (data?.stops ?? [])
     .map((stop) =>
       modeFilter.size > 0
@@ -26,6 +27,16 @@ export function NearbyDepartures({ lat, lng }: Props) {
         : stop
     )
     .filter((stop) => modeFilter.size === 0 || stop.departures.length > 0)
+    .map((stop) => ({
+      ...stop,
+      departures: stop.departures.filter((d) => {
+        const key = `${d.serviceId}:${d.destination}`
+        if (seenRoutes.has(key)) return false
+        seenRoutes.add(key)
+        return true
+      }),
+    }))
+    .filter((stop) => stop.departures.length > 0)
   const stopIds = data?.stops.map((s) => s.stopId) ?? []
   const { alerts } = useAlerts(stopIds)
 
