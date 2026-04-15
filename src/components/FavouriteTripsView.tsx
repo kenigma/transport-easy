@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import useSWR from 'swr'
 import type { FavouriteTrip, Departure } from '@/lib/types'
+import { normalizeStopName } from '@/lib/tfnsw/trip'
 import {
   minutesUntil, effectiveTime, formatCountdown, formatClockTime,
   isReachable, urgencyWithWalk, humanMessage,
@@ -55,7 +56,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&maxPastMinutes=${maxPastMinutes}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
 
-  const allDepartures = data?.departures ?? []
+  const allDepartures = (data?.departures ?? []).filter((dep) => dep.mode === trip.mode)
 
   const reachable = allDepartures.filter((dep) => {
     if (dep.isCancelled) return false
@@ -99,10 +100,10 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-gray-500 truncate">
-              {MODE_EMOJI[trip.mode] ?? '🚌'} {trip.stopName}
+              {MODE_EMOJI[trip.mode] ?? '🚌'} {normalizeStopName(trip.stopName)}
             </p>
             <h2 className="text-base font-semibold text-gray-900 leading-snug">
-              → {trip.userDestination ?? trip.destination}
+              → {normalizeStopName(trip.userDestination ?? trip.destination)}
             </h2>
             {trip.lineName && (
               <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
@@ -123,7 +124,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
             )}
             {trip.lat && trip.lng ? (
               <a
-                href={`https://maps.apple.com/?q=${encodeURIComponent(trip.stopName)}&ll=${trip.lat},${trip.lng}`}
+                href={`https://maps.apple.com/?q=${encodeURIComponent(normalizeStopName(trip.stopName))}&ll=${trip.lat},${trip.lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-base p-1"
@@ -231,7 +232,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
           <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
             <span className="text-base">🚉</span>
             <p className="text-sm text-blue-700 font-medium">
-              On board · arrives {trip.userDestination ?? trip.destination} {formatClockTime(onBoardArrival)}
+              On board · arrives {normalizeStopName(trip.userDestination ?? trip.destination)} {formatClockTime(onBoardArrival)}
             </p>
           </div>
         )}

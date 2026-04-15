@@ -2,6 +2,7 @@
 
 import type { TripLeg } from '@/lib/types'
 import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import { normalizeStopName } from '@/lib/tfnsw/trip'
 
 const MODE_EMOJI: Record<string, string> = {
   train: '🚆', metro: '🚇', bus: '🚌', ferry: '⛴️', lightrail: '🚊', coach: '🚍', unknown: '🚌',
@@ -69,10 +70,10 @@ export function LegRow({ leg, fromStopId }: Props) {
       add({
         id: tripId,
         stopId: effectiveStopId,
-        stopName: leg.originName,
+        stopName: normalizeStopName(leg.originName),
         serviceId: leg.serviceId!,
         lineName: leg.lineName,
-        destination: leg.destinationName,
+        destination: normalizeStopName(leg.destinationName),
         mode: leg.mode ?? 'unknown',
         walkMinutes: 0,
         lat: leg.stopLat ?? 0,

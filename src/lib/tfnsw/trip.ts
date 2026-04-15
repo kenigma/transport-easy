@@ -157,7 +157,7 @@ function parseJourney(raw: { legs?: RawLeg[] }): Journey | null {
  * "Gordon Station, Platform 2, Gordon" → "Gordon Station"
  * "Chatswood Station, Chatswood" → "Chatswood Station"
  */
-function normalizeStopName(name: string): string {
+export function normalizeStopName(name: string): string {
   const idx = name.indexOf(', ')
   return idx === -1 ? name : name.slice(0, idx)
 }

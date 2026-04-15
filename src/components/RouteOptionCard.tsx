@@ -4,6 +4,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import type { RouteOption, TimetableResponse, FavouriteTrip } from '@/lib/types'
 import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import { normalizeStopName } from '@/lib/tfnsw/trip'
 import { LegRow } from './LegRow'
 
 const MODE_EMOJI: Record<string, string> = {
@@ -85,10 +86,10 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromSt
       ? {
           id: tripId,
           stopId: effectiveStopId,
-          stopName: firstTransitLeg.originName,
+          stopName: normalizeStopName(firstTransitLeg.originName),
           serviceId: firstTransitLeg.serviceId!,
           lineName: firstTransitLeg.lineName,
-          destination: firstTransitLeg.destinationName,
+          destination: normalizeStopName(firstTransitLeg.destinationName),
           mode: firstTransitLeg.mode ?? 'unknown',
           walkMinutes,
           lat: firstTransitLeg.stopLat ?? 0,
