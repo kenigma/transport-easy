@@ -6,7 +6,6 @@ import { UrgencyBadge } from './UrgencyBadge'
 import { TimetableSheet } from './TimetableSheet'
 import { VehicleMap } from './VehicleMap'
 import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
-import { useGeolocation } from '@/hooks/useGeolocation'
 
 const MODE_EMOJI: Record<string, string> = {
   train: '🚆',
@@ -16,14 +15,6 @@ const MODE_EMOJI: Record<string, string> = {
   lightrail: '🚊',
   coach: '🚍',
   unknown: '🚌',
-}
-
-const WALK_PRESETS = [0, 3, 5, 8, 10, 15, 20]
-
-function nearestPreset(minutes: number): number {
-  return WALK_PRESETS.reduce((a, b) =>
-    Math.abs(b - minutes) < Math.abs(a - minutes) ? b : a
-  )
 }
 
 interface Props {
@@ -37,13 +28,9 @@ interface Props {
 export function DepartureRow({ departure, stopId, stopName, stopLat, stopLng }: Props) {
   const [showTimetable, setShowTimetable] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
-  const [showWalkPicker, setShowWalkPicker] = useState(false)
-  const [walkEstimate, setWalkEstimate] = useState<number | null>(null)
-  const [estimating, setEstimating] = useState(false)
   const { isFavourite, add, remove } = useFavouriteTrips()
-  const { state: geoState } = useGeolocation()
 
-  const tripId = `${stopId}:${departure.serviceId}:${departure.destination}`
+  const tripId = `${stopId}:${departure.destination}`
   const saved = isFavourite(tripId)
 
   const emoji = MODE_EMOJI[departure.mode] ?? '🚌'
@@ -54,44 +41,22 @@ export function DepartureRow({ departure, stopId, stopName, stopLat, stopLng }: 
     e.stopPropagation()
     if (saved) {
       remove(tripId)
-      return
+    } else {
+      add({
+        id: tripId,
+        stopId,
+        stopName,
+        serviceId: departure.serviceId,
+        lineName: departure.lineName,
+        destination: departure.destination,
+        mode: departure.mode,
+        walkMinutes: 0,
+        lat: stopLat,
+        lng: stopLng,
+        travelMinutes: null,
+        userDestination: null,
+      })
     }
-    setShowWalkPicker(true)
-    setWalkEstimate(null)
-
-    // Auto-estimate walk time if GPS is available
-    if (geoState.status === 'granted') {
-      setEstimating(true)
-      const { lat, lng } = geoState.coords
-      fetch(`/api/walktime?fromLat=${lat}&fromLng=${lng}&toLat=${stopLat}&toLng=${stopLng}`)
-        .then((r) => r.json())
-        .then((d) => {
-          if (typeof d.walkMinutes === 'number') {
-            setWalkEstimate(nearestPreset(d.walkMinutes))
-          }
-        })
-        .catch(() => {})
-        .finally(() => setEstimating(false))
-    }
-  }
-
-  const handlePickWalkTime = (mins: number) => {
-    add({
-      id: tripId,
-      stopId,
-      stopName,
-      serviceId: departure.serviceId,
-      lineName: departure.lineName,
-      destination: departure.destination,
-      mode: departure.mode,
-      walkMinutes: mins,
-      lat: stopLat,
-      lng: stopLng,
-      travelMinutes: null,
-      userDestination: null,
-    })
-    setShowWalkPicker(false)
-    setWalkEstimate(null)
   }
 
   return (
@@ -142,48 +107,6 @@ export function DepartureRow({ departure, stopId, stopName, stopLat, stopLng }: 
         {/* Countdown badge */}
         <UrgencyBadge departure={departure} />
       </div>
-
-      {/* Inline walk time picker */}
-      {showWalkPicker && (
-        <div
-          className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-3 -mx-1 mb-1"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-gray-500 font-medium">Walk time to this stop:</p>
-            {estimating && (
-              <span className="text-xs text-tfnsw-blue">Estimating…</span>
-            )}
-            {!estimating && walkEstimate !== null && (
-              <span className="text-xs text-tfnsw-blue">~{walkEstimate === 0 ? 'No walk' : `${walkEstimate} min`} estimated</span>
-            )}
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {WALK_PRESETS.map((mins) => {
-              const isEstimated = mins === walkEstimate
-              return (
-                <button
-                  key={mins}
-                  onClick={() => handlePickWalkTime(mins)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
-                    isEstimated
-                      ? 'bg-tfnsw-blue text-white border-tfnsw-blue'
-                      : 'bg-white border-gray-200 hover:border-tfnsw-blue hover:text-tfnsw-blue'
-                  }`}
-                >
-                  {mins === 0 ? 'No walk' : `${mins} min`}{isEstimated ? ' ✓' : ''}
-                </button>
-              )
-            })}
-          </div>
-          <button
-            onClick={() => { setShowWalkPicker(false); setWalkEstimate(null) }}
-            className="mt-2 text-xs text-gray-400 underline"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
 
       {showVehicleMap && (
         <VehicleMap

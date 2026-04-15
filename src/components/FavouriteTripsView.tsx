@@ -8,6 +8,7 @@ import {
   isReachable, urgencyWithWalk, humanMessage,
 } from '@/lib/time'
 import { useCountdown } from '@/hooks/useCountdown'
+import { useGeolocation } from '@/hooks/useGeolocation'
 import { VehicleMap } from './VehicleMap'
 
 const MODE_EMOJI: Record<string, string> = {
@@ -21,58 +22,39 @@ const URGENCY_STYLES = {
   departed: 'bg-gray-300 text-gray-600',
 }
 
-const WALK_PRESETS = [0, 3, 5, 8, 10, 15, 20]
-
 async function fetchDepartures(url: string) {
   const res = await fetch(url)
   if (!res.ok) throw new Error('Failed to fetch')
   return res.json() as Promise<{ departures: Departure[] }>
 }
 
-function WalkTimePicker({ currentMins, onSelect, onClose }: {
-  currentMins: number
-  onSelect: (mins: number) => void
-  onClose: () => void
-}) {
-  return (
-    <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-3">
-      <p className="text-xs text-gray-500 mb-2 font-medium">Walk time to stop:</p>
-      <div className="flex gap-1.5 flex-wrap">
-        {WALK_PRESETS.map((mins) => (
-          <button
-            key={mins}
-            onClick={() => onSelect(mins)}
-            className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
-              mins === currentMins
-                ? 'bg-tfnsw-blue text-white border-tfnsw-blue'
-                : 'bg-white border-gray-200 hover:border-tfnsw-blue hover:text-tfnsw-blue'
-            }`}
-          >
-            {mins === 0 ? 'No walk' : `${mins} min`}
-          </button>
-        ))}
-      </div>
-      <button onClick={onClose} className="mt-2 text-xs text-gray-400 underline">Done</button>
-    </div>
-  )
-}
-
-function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChange }: {
+function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   trip: FavouriteTrip
   onRemove: (id: string) => void
-  onUpdateWalkTime: (id: string, mins: number) => void
   onPrimaryMinsChange?: (id: string, mins: number | null) => void
 }) {
   useCountdown(10_000)
-  const [editingWalk, setEditingWalk] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [walkMins, setWalkMins] = useState(0)
+  const { state: geoState } = useGeolocation()
+
+  // Compute live walk time from GPS to stop
+  const gpsLat = geoState.status === 'granted' ? geoState.coords.lat : null
+  const gpsLng = geoState.status === 'granted' ? geoState.coords.lng : null
+
+  useEffect(() => {
+    if (!gpsLat || !gpsLng || !trip.lat || !trip.lng) return
+    fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${trip.lat}&toLng=${trip.lng}`)
+      .then(r => r.json())
+      .then(d => { if (typeof d.walkMinutes === 'number') setWalkMins(d.walkMinutes) })
+      .catch(() => {})
+  }, [gpsLat, gpsLng, trip.lat, trip.lng])
 
   const maxPastMinutes = trip.travelMinutes ?? 1
-  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&serviceId=${encodeURIComponent(trip.serviceId)}&destination=${encodeURIComponent(trip.destination)}&maxPastMinutes=${maxPastMinutes}`
+  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&destination=${encodeURIComponent(trip.destination)}&maxPastMinutes=${maxPastMinutes}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
 
-  const walkMins = trip.walkMinutes ?? 0
   const allDepartures = data?.departures ?? []
 
   const reachable = allDepartures.filter((dep) => {
@@ -120,7 +102,7 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
               {MODE_EMOJI[trip.mode] ?? '🚌'} {trip.stopName}
             </p>
             <h2 className="text-base font-semibold text-gray-900 leading-snug">
-              {trip.serviceId} → {trip.userDestination ?? trip.destination}
+              → {trip.userDestination ?? trip.destination}
             </h2>
             {trip.lineName && (
               <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
@@ -178,20 +160,9 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
           </div>
         </div>
 
-        {/* Walk time chip */}
-        <button
-          onClick={() => setEditingWalk((v) => !v)}
-          className="mt-2 text-xs border border-gray-200 rounded-full px-2.5 py-1 text-gray-500 hover:border-tfnsw-blue hover:text-tfnsw-blue transition-colors"
-        >
-          🚶 {walkMins === 0 ? 'Add walk time' : `${walkMins} min walk`}
-        </button>
-
-        {editingWalk && (
-          <WalkTimePicker
-            currentMins={walkMins}
-            onSelect={(mins) => { onUpdateWalkTime(trip.id, mins); setEditingWalk(false) }}
-            onClose={() => setEditingWalk(false)}
-          />
+        {/* Live walk time */}
+        {walkMins > 0 && (
+          <p className="mt-2 text-xs text-gray-400">🚶 {walkMins} min walk</p>
         )}
       </div>
 
@@ -232,7 +203,7 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
               {primaryMessage}
             </span>
             <div className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{formatCountdown(primaryMins!)}</span>
+              <span className="font-semibold text-gray-900">{primary.serviceId} · {formatCountdown(primaryMins!)}</span>
               <span className="text-gray-400 ml-1">· {formatClockTime(effectiveTime(primary))}</span>
               {trip.travelMinutes != null && (
                 <span className="text-gray-400 ml-1">
@@ -249,7 +220,7 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
               const mins = minutesUntil(effectiveTime(dep))
               return (
                 <span key={`${dep.scheduledDepartureTime}-${i}`} className="text-xs text-gray-400">
-                  {i === 0 ? 'Then' : '·'} {formatCountdown(mins)} · {formatClockTime(effectiveTime(dep))}
+                  {i === 0 ? 'Then' : '·'} {dep.serviceId} {formatCountdown(mins)} · {formatClockTime(effectiveTime(dep))}
                 </span>
               )
             })}
@@ -272,10 +243,9 @@ function FavouriteTripCard({ trip, onRemove, onUpdateWalkTime, onPrimaryMinsChan
 interface Props {
   trips: FavouriteTrip[]
   onRemove: (id: string) => void
-  onUpdateWalkTime: (id: string, mins: number) => void
 }
 
-export function FavouriteTripsView({ trips, onRemove, onUpdateWalkTime }: Props) {
+export function FavouriteTripsView({ trips, onRemove }: Props) {
   const [sortKeys, setSortKeys] = useState<Record<string, number>>({})
 
   const handlePrimaryMins = useCallback((id: string, mins: number | null) => {
@@ -291,7 +261,7 @@ export function FavouriteTripsView({ trips, onRemove, onUpdateWalkTime }: Props)
   return (
     <div className="space-y-4">
       {sorted.map((trip) => (
-        <FavouriteTripCard key={trip.id} trip={trip} onRemove={onRemove} onUpdateWalkTime={onUpdateWalkTime} onPrimaryMinsChange={handlePrimaryMins} />
+        <FavouriteTripCard key={trip.id} trip={trip} onRemove={onRemove} onPrimaryMinsChange={handlePrimaryMins} />
       ))}
     </div>
   )

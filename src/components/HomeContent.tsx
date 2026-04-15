@@ -7,9 +7,12 @@ import { NearbyDepartures } from './NearbyDepartures'
 import { FavouriteTripsView } from './FavouriteTripsView'
 import { TripPlanner } from './TripPlanner'
 import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import { haversineKm } from '@/lib/tfnsw/vehiclePositions'
 import type { GeocodeResult } from '@/lib/types'
 
-type ActiveTab = 'mytrips' | 'nearby' | 'plan'
+type ActiveTab = 'home' | 'plan'
+
+const NEARBY_THRESHOLD_KM = 0.5
 
 function tabClass(active: boolean): string {
   return `flex-1 py-2 text-sm font-medium rounded-xl transition-colors ${
@@ -19,79 +22,90 @@ function tabClass(active: boolean): string {
 
 export function HomeContent() {
   const [manualLocation, setManualLocation] = useState<GeocodeResult | null>(null)
-  const { trips, remove, updateWalkTime } = useFavouriteTrips()
-  const hasFavourites = trips.length > 0
+  const { trips, remove } = useFavouriteTrips()
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    if (typeof window === 'undefined') return 'nearby'
-    try {
-      const raw = localStorage.getItem('transport-easy:favourite-trips')
-      const parsed: unknown[] = raw ? JSON.parse(raw) : []
-      return parsed.length > 0 ? 'mytrips' : 'nearby'
-    } catch {
-      return 'nearby'
-    }
-  })
+  const [activeTab, setActiveTab] = useState<ActiveTab>('home')
 
   return (
     <div className="space-y-4">
-      <LocationGate>
-        {(gpsCoords) => {
-          const coords = manualLocation
-            ? { lat: manualLocation.lat, lng: manualLocation.lng }
-            : gpsCoords
+      {/* Tab bar */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('home')}
+          className={tabClass(activeTab === 'home')}
+        >
+          🏠 Home
+        </button>
+        <button
+          onClick={() => setActiveTab('plan')}
+          className={tabClass(activeTab === 'plan')}
+        >
+          🗺️ Plan
+        </button>
+      </div>
 
-          return (
-            <>
-              {/* Tab bar */}
-              <div className="flex gap-2">
-                {hasFavourites && (
-                  <button
-                    onClick={() => setActiveTab('mytrips')}
-                    className={tabClass(activeTab === 'mytrips')}
-                  >
-                    ★ My trips
-                  </button>
+      {/* Home tab */}
+      {activeTab === 'home' && (
+        <LocationGate>
+          {(gpsCoords) => {
+            const coords = manualLocation
+              ? { lat: manualLocation.lat, lng: manualLocation.lng }
+              : gpsCoords
+
+            const nearbyTrips = trips.filter(
+              (t) => t.lat && t.lng && haversineKm(coords.lat, coords.lng, t.lat, t.lng) < NEARBY_THRESHOLD_KM
+            )
+            const otherTrips = trips.filter(
+              (t) => !t.lat || !t.lng || haversineKm(coords.lat, coords.lng, t.lat, t.lng) >= NEARBY_THRESHOLD_KM
+            )
+
+            return (
+              <div className="space-y-5">
+                {/* Your trips — nearby saved trips */}
+                {nearbyTrips.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Your trips</p>
+                    <FavouriteTripsView trips={nearbyTrips} onRemove={remove} />
+                  </div>
                 )}
-                <button
-                  onClick={() => setActiveTab('nearby')}
-                  className={tabClass(activeTab === 'nearby')}
-                >
-                  📍 Nearby
-                </button>
-                <button
-                  onClick={() => setActiveTab('plan')}
-                  className={tabClass(activeTab === 'plan')}
-                >
-                  🗺️ Plan
-                </button>
-              </div>
 
-              {/* My Trips */}
-              {activeTab === 'mytrips' && hasFavourites && (
-                <FavouriteTripsView trips={trips} onRemove={remove} onUpdateWalkTime={updateWalkTime} />
-              )}
-
-              {/* Nearby */}
-              {activeTab === 'nearby' && (
-                <>
+                {/* Nearby stops */}
+                <div>
+                  {trips.length > 0 && (
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Nearby stops</p>
+                  )}
                   <LocationSearch
                     manualLocation={manualLocation}
                     onSelect={setManualLocation}
                     onUseGPS={() => setManualLocation(null)}
                   />
                   <NearbyDepartures lat={coords.lat} lng={coords.lng} />
-                </>
-              )}
+                </div>
 
-              {/* Plan */}
-              {activeTab === 'plan' && (
-                <TripPlanner gpsCoords={coords} />
-              )}
-            </>
-          )
-        }}
-      </LocationGate>
+                {/* Other saved trips — not nearby */}
+                {otherTrips.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Other saved trips</p>
+                    <FavouriteTripsView trips={otherTrips} onRemove={remove} />
+                  </div>
+                )}
+              </div>
+            )
+          }}
+        </LocationGate>
+      )}
+
+      {/* Plan tab */}
+      {activeTab === 'plan' && (
+        <LocationGate>
+          {(gpsCoords) => {
+            const coords = manualLocation
+              ? { lat: manualLocation.lat, lng: manualLocation.lng }
+              : gpsCoords
+            return <TripPlanner gpsCoords={coords} />
+          }}
+        </LocationGate>
+      )}
     </div>
   )
 }

@@ -9,8 +9,15 @@ function load(): FavouriteTrip[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed: FavouriteTrip[] = raw ? JSON.parse(raw) : []
-    // Migrate old entries that don't have walkMinutes
-    return parsed.map((t) => ({ ...t, walkMinutes: t.walkMinutes ?? 0, lat: t.lat ?? 0, lng: t.lng ?? 0, travelMinutes: t.travelMinutes ?? null, userDestination: t.userDestination ?? null }))
+    // Migrate old 3-part IDs (stopId:serviceId:destination) to 2-part (stopId:destination)
+    const migrated = parsed.map((t) => {
+      const parts = t.id.split(':')
+      const newId = parts.length === 3 ? `${parts[0]}:${parts[2]}` : t.id
+      return { ...t, id: newId, walkMinutes: t.walkMinutes ?? 0, lat: t.lat ?? 0, lng: t.lng ?? 0, travelMinutes: t.travelMinutes ?? null, userDestination: t.userDestination ?? null }
+    })
+    // Deduplicate by id (keep first occurrence)
+    const seen = new Set<string>()
+    return migrated.filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
   } catch {
     return []
   }

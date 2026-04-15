@@ -27,6 +27,14 @@ export interface GeocodeResult {
   lng: number
 }
 
+export interface StopResult {
+  stopId: string
+  name: string
+  lat: number
+  lng: number
+  modes: TransportMode[]
+}
+
 export interface StopWithDepartures extends StopInfo {
   departures: Departure[]
 }

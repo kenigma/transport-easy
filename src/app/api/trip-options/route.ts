@@ -50,6 +50,8 @@ export async function GET(req: NextRequest) {
   const toLng = parseFloat(searchParams.get('toLng') ?? '')
   const fromName = searchParams.get('fromName') ?? 'Current location'
   const toName = searchParams.get('toName') ?? 'Destination'
+  const fromStopId = searchParams.get('fromStopId') ?? null
+  const toStopId = searchParams.get('toStopId') ?? null
 
   if ([fromLat, fromLng, toLat, toLng].some(isNaN)) {
     return NextResponse.json({ error: 'fromLat, fromLng, toLat, toLng are required' }, { status: 400 })
@@ -58,7 +60,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Coordinates must be within NSW' }, { status: 400 })
   }
 
-  const cacheKey = `trip-options:${fromLat.toFixed(3)},${fromLng.toFixed(3)}:${toLat.toFixed(3)},${toLng.toFixed(3)}`
+  // Build stop-based extra params for getTrip when stop IDs are available
+  const stopExtraParams: Record<string, string> = {}
+  if (fromStopId) {
+    stopExtraParams.type_origin = 'stop'
+    stopExtraParams.name_origin = fromStopId
+    stopExtraParams.isGlobalId = '1'
+  }
+  if (toStopId) {
+    stopExtraParams.type_destination = 'stop'
+    stopExtraParams.name_destination = toStopId
+  }
+
+  const cacheKey = `trip-options:${fromStopId ?? `${fromLat.toFixed(3)},${fromLng.toFixed(3)}`}:${toStopId ?? `${toLat.toFixed(3)},${toLng.toFixed(3)}`}`
   const cached = cacheGet<RouteOptionsResponse>(cacheKey)
   if (cached) return NextResponse.json(cached, { headers: { 'X-Cache': 'HIT', 'Cache-Control': 'no-store' } })
 
@@ -67,7 +81,7 @@ export async function GET(req: NextRequest) {
     const slots = [7, 10, 13, 16, 19].map((h) => sydneyDateAtHour(h))
     const [slotResults, nearbyStops] = await Promise.all([
       Promise.all(
-        slots.map((dt) => getTrip(fromLat, fromLng, toLat, toLng, dt, 10).catch(() => [] as Journey[]))
+        slots.map((dt) => getTrip(fromLat, fromLng, toLat, toLng, dt, 10, Object.keys(stopExtraParams).length ? stopExtraParams : undefined).catch(() => [] as Journey[]))
       ),
       findNearbyStops(fromLat, fromLng, 1500, 30).catch(() => []),
     ])

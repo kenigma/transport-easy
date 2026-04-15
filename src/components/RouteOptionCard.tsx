@@ -75,7 +75,7 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng }: Prop
     ? Math.round((firstWalkLeg.walkDurationSeconds ?? firstWalkLeg.durationSeconds) / 60)
     : 0
   const tripId = firstTransitLeg?.stopId
-    ? `${firstTransitLeg.stopId}:${firstTransitLeg.serviceId}:${firstTransitLeg.legDestination}`
+    ? `${firstTransitLeg.stopId}:${firstTransitLeg.legDestination ?? firstTransitLeg.destinationName}`
     : null
   const favouriteTrip: FavouriteTrip | null =
     tripId && firstTransitLeg?.stopId

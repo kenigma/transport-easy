@@ -2,21 +2,24 @@
 
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
-import type { GeocodeResult, RouteOptionsResponse } from '@/lib/types'
+import type { StopResult, RouteOptionsResponse } from '@/lib/types'
 import { RouteOptionCard } from './RouteOptionCard'
+
+const MODE_EMOJI: Record<string, string> = {
+  train: '🚆', metro: '🚇', bus: '🚌', ferry: '⛴️', lightrail: '🚊', coach: '🚍', unknown: '🚌',
+}
 
 interface SearchBoxProps {
   placeholder: string
-  selected: GeocodeResult | null
-  onSelect: (r: GeocodeResult) => void
+  selected: StopResult | null
+  onSelect: (r: StopResult) => void
   onClear: () => void
-  gpsCoords?: { lat: number; lng: number }
   autoFocus?: boolean
 }
 
-function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFocus }: SearchBoxProps) {
+function SearchBox({ placeholder, selected, onSelect, onClear, autoFocus }: SearchBoxProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<GeocodeResult[]>([])
+  const [results, setResults] = useState<StopResult[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -29,12 +32,10 @@ function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFo
 
     setLoading(true)
     debounceRef.current = setTimeout(async () => {
-      // Cancel any in-flight request
       abortRef.current?.abort()
       abortRef.current = new AbortController()
       try {
-        const locationParams = gpsCoords ? `&lat=${gpsCoords.lat}&lng=${gpsCoords.lng}` : ''
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}${locationParams}`, {
+        const res = await fetch(`/api/stop-search?q=${encodeURIComponent(q)}`, {
           signal: abortRef.current.signal,
         })
         const data = await res.json()
@@ -49,13 +50,12 @@ function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFo
     }, 350)
   }
 
-  // Cleanup on unmount
   useEffect(() => () => {
     debounceRef.current && clearTimeout(debounceRef.current)
     abortRef.current?.abort()
   }, [])
 
-  const pick = (r: GeocodeResult) => {
+  const pick = (r: StopResult) => {
     onSelect(r)
     setQuery('')
     setResults([])
@@ -83,7 +83,9 @@ function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFo
   if (selected) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200">
-        <span className="text-sm text-gray-800 flex-1 truncate">📍 {selected.name}</span>
+        <span className="text-sm text-gray-800 flex-1 truncate">
+          {selected.modes.length > 0 ? (MODE_EMOJI[selected.modes[0]] ?? '📍') : '📍'} {selected.name}
+        </span>
         <button onClick={onClear} className="text-gray-400 text-xs underline flex-shrink-0">Change</button>
       </div>
     )
@@ -112,14 +114,14 @@ function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFo
         <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
           {results.map((r, i) => (
             <button
-              key={i}
+              key={r.stopId}
               onMouseDown={() => pick(r)}
               onMouseEnter={() => setHighlightedIndex(i)}
               className={`w-full text-left px-4 py-3 text-sm border-b border-gray-50 last:border-0 ${
                 i === highlightedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'
               }`}
             >
-              <span className="text-gray-400 mr-2">📍</span>{r.name}
+              <span className="text-gray-400 mr-2">{r.modes.length > 0 ? (MODE_EMOJI[r.modes[0]] ?? '📍') : '📍'}</span>{r.name}
             </button>
           ))}
         </div>
@@ -127,7 +129,7 @@ function SearchBox({ placeholder, selected, onSelect, onClear, gpsCoords, autoFo
 
       {open && results.length === 0 && !loading && query.length >= 2 && (
         <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-100 px-4 py-3 text-sm text-gray-400">
-          No results for "{query}"
+          No stops found for &ldquo;{query}&rdquo;
         </div>
       )}
     </div>
@@ -148,22 +150,34 @@ interface Props {
 }
 
 export function TripPlanner({ gpsCoords }: Props) {
-  const [fromLocation, setFromLocation] = useState<GeocodeResult | null>(null)
+  const [fromLocation, setFromLocation] = useState<StopResult | null>(null)
   const [changingFrom, setChangingFrom] = useState(false)
-  const [toLocation, setToLocation] = useState<GeocodeResult | null>(null)
+  const [toLocation, setToLocation] = useState<StopResult | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
   const fromCoords = fromLocation ?? gpsCoords
   const fromName = fromLocation?.name ?? 'Current location'
 
-  const url = submitted && toLocation
-    ? `/api/trip-options?fromLat=${fromCoords.lat}&fromLng=${fromCoords.lng}&toLat=${toLocation.lat}&toLng=${toLocation.lng}&fromName=${encodeURIComponent(fromName)}&toName=${encodeURIComponent(toLocation.name)}`
-    : null
+  // Build URL with optional stop IDs for more accurate routing
+  const url = (() => {
+    if (!submitted || !toLocation) return null
+    const params = new URLSearchParams({
+      fromLat: String(fromCoords.lat),
+      fromLng: String(fromCoords.lng),
+      toLat: String(toLocation.lat),
+      toLng: String(toLocation.lng),
+      fromName,
+      toName: toLocation.name,
+    })
+    if (fromLocation?.stopId) params.set('fromStopId', fromLocation.stopId)
+    if (toLocation?.stopId) params.set('toStopId', toLocation.stopId)
+    return `/api/trip-options?${params.toString()}`
+  })()
 
   const { data, error, isLoading, mutate } = useSWR<RouteOptionsResponse>(url, fetchRouteOptions)
 
-  const handleFromSelect = (r: GeocodeResult) => { setFromLocation(r); setChangingFrom(false); setSubmitted(false) }
-  const handleToSelect = (r: GeocodeResult) => { setToLocation(r); setSubmitted(false) }
+  const handleFromSelect = (r: StopResult) => { setFromLocation(r); setChangingFrom(false); setSubmitted(false) }
+  const handleToSelect = (r: StopResult) => { setToLocation(r); setSubmitted(false) }
 
   return (
     <div className="space-y-3">
@@ -174,16 +188,17 @@ export function TripPlanner({ gpsCoords }: Props) {
           <div className="flex-1">
             {changingFrom ? (
               <SearchBox
-                placeholder="Enter origin address or suburb…"
+                placeholder="Enter station or stop name…"
                 selected={null}
                 onSelect={handleFromSelect}
                 onClear={() => { setChangingFrom(false) }}
-                gpsCoords={gpsCoords}
                 autoFocus={true}
               />
             ) : fromLocation ? (
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200">
-                <span className="text-sm text-gray-800 flex-1 truncate">📍 {fromLocation.name}</span>
+                <span className="text-sm text-gray-800 flex-1 truncate">
+                  {fromLocation.modes.length > 0 ? (MODE_EMOJI[fromLocation.modes[0]] ?? '📍') : '📍'} {fromLocation.name}
+                </span>
                 <button onClick={() => { setFromLocation(null); setChangingFrom(true); setSubmitted(false) }} className="text-gray-400 text-xs underline flex-shrink-0">Change</button>
               </div>
             ) : (
@@ -199,11 +214,10 @@ export function TripPlanner({ gpsCoords }: Props) {
           <span className="text-xs text-gray-500 w-8 text-right flex-shrink-0 pt-2.5">To</span>
           <div className="flex-1">
             <SearchBox
-              placeholder="Where to? (suburb, station, address…)"
+              placeholder="Where to? (station or stop name…)"
               selected={toLocation}
               onSelect={handleToSelect}
               onClear={() => { setToLocation(null); setSubmitted(false) }}
-              gpsCoords={gpsCoords}
             />
           </div>
         </div>
@@ -236,7 +250,7 @@ export function TripPlanner({ gpsCoords }: Props) {
       {!isLoading && !error && data && data.options.length === 0 && (
         <div className="text-center py-10 text-gray-400">
           <p className="text-3xl mb-2">🗺️</p>
-          <p className="text-sm">No routes found between these locations.</p>
+          <p className="text-sm">No routes found between these stops.</p>
           <p className="text-xs mt-1">Try a different destination or check service alerts.</p>
         </div>
       )}

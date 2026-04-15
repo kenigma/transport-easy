@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 export default function FavouritesPage() {
-  const { trips, remove, updateWalkTime } = useFavouriteTrips()
+  const { trips, remove } = useFavouriteTrips()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
@@ -38,7 +38,7 @@ export default function FavouritesPage() {
         </div>
       )}
 
-      {mounted && trips.length > 0 && <FavouriteTripsView trips={trips} onRemove={remove} onUpdateWalkTime={updateWalkTime} />}
+      {mounted && trips.length > 0 && <FavouriteTripsView trips={trips} onRemove={remove} />}
     </main>
   )
 }

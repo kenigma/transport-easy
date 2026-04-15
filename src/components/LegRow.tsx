@@ -43,7 +43,7 @@ export function LegRow({ leg }: Props) {
   }
 
   const tripId = leg.stopId
-    ? `${leg.stopId}:${leg.serviceId}:${leg.legDestination}`
+    ? `${leg.stopId}:${leg.legDestination ?? leg.destinationName}`
     : null
   const saved = tripId ? isFavourite(tripId) : false
   const emoji = MODE_EMOJI[leg.mode ?? 'unknown'] ?? '🚌'
