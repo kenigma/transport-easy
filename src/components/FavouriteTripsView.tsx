@@ -37,7 +37,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   useCountdown(10_000)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
-  const [walkMins, setWalkMins] = useState(0)
+  const [walkMins, setWalkMins] = useState(trip.walkMinutes ?? 0)
   const { state: geoState } = useGeolocation()
 
   // Compute live walk time from GPS to stop
