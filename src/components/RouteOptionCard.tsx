@@ -213,7 +213,10 @@ export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromSt
                         {(() => { const svcId = entry.journey.legs.find(l => !l.isWalk)?.serviceId; return svcId ? <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{svcId}</span> : null })()}
                         <span className="text-gray-300 text-xs">→</span>
                         <span className="text-sm text-gray-600">
-                          {formatTime(entry.arrivalPlanned)}
+                          {formatTime(
+                            entry.journey.legs.filter(l => !l.isWalk).at(-1)?.destinationArrivalPlanned
+                            ?? entry.arrivalPlanned
+                          )}
                         </span>
                       </div>
                       <span className="text-gray-400 text-xs flex-shrink-0">{isEntryExpanded ? '▲' : '▾'}</span>
