@@ -69,6 +69,14 @@ export function HomeContent() {
                   </div>
                 )}
 
+                {/* Other saved trips — not nearby */}
+                {otherTrips.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Other saved trips</p>
+                    <FavouriteTripsView trips={otherTrips} onRemove={remove} />
+                  </div>
+                )}
+
                 {/* Nearby stops */}
                 <div>
                   {trips.length > 0 && (
@@ -81,14 +89,6 @@ export function HomeContent() {
                   />
                   <NearbyDepartures lat={coords.lat} lng={coords.lng} />
                 </div>
-
-                {/* Other saved trips — not nearby */}
-                {otherTrips.length > 0 && (
-                  <div>
-                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Other saved trips</p>
-                    <FavouriteTripsView trips={otherTrips} onRemove={remove} />
-                  </div>
-                )}
               </div>
             )
           }}
