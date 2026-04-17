@@ -38,22 +38,23 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   useCountdown(10_000)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
-  const [walkMins, setWalkMins] = useState(trip.walkMinutes ?? 0)
+  const [walkMins, setWalkMins] = useState<number | null>(null)
   const { state: geoState } = useGeolocation()
 
-  // Compute live walk time from GPS to stop
+  // Always compute live walk time from current GPS position to stop
   const gpsLat = geoState.status === 'granted' ? geoState.coords.lat : null
   const gpsLng = geoState.status === 'granted' ? geoState.coords.lng : null
 
-  // Only use live GPS walk time when near the stop (< 1 km); otherwise stored value is more useful
   useEffect(() => {
     if (!gpsLat || !gpsLng || !trip.lat || !trip.lng) return
-    if (haversineKm(gpsLat, gpsLng, trip.lat, trip.lng) > 1) return
     fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${trip.lat}&toLng=${trip.lng}`)
       .then(r => r.json())
       .then(d => { if (typeof d.walkMinutes === 'number') setWalkMins(d.walkMinutes) })
       .catch(() => {})
   }, [gpsLat, gpsLng, trip.lat, trip.lng])
+
+  // Only apply reachability/urgency logic when walk time is actionable (nearby)
+  const actionableWalk = walkMins !== null && walkMins < 30 ? walkMins : 0
 
   const maxPastMinutes = trip.travelMinutes ?? 1
   const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&maxPastMinutes=${maxPastMinutes}`
@@ -64,15 +65,15 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const reachable = allDepartures.filter((dep) => {
     if (dep.isCancelled) return false
     const mins = minutesUntil(effectiveTime(dep))
-    return isReachable(mins, walkMins)
+    return isReachable(mins, actionableWalk)
   })
 
   const primary = reachable[0] ?? null
   const secondary = reachable.slice(1, 3)
 
   const primaryMins = primary ? minutesUntil(effectiveTime(primary)) : null
-  const primaryLevel = primaryMins !== null ? urgencyWithWalk(primaryMins, walkMins) : 'departed'
-  const primaryMessage = primaryMins !== null ? humanMessage(primaryMins, walkMins) : null
+  const primaryLevel = primaryMins !== null ? urgencyWithWalk(primaryMins, actionableWalk) : 'departed'
+  const primaryMessage = primaryMins !== null ? humanMessage(primaryMins, actionableWalk) : null
 
   const onBoard = (() => {
     if (!trip.travelMinutes) return null
@@ -165,7 +166,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
         </div>
 
         {/* Live walk time */}
-        {walkMins > 0 && (
+        {walkMins !== null && walkMins > 0 && (
           <p className="mt-2 text-xs text-gray-400">🚶 {walkMins} min walk</p>
         )}
       </div>
