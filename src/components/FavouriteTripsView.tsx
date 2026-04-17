@@ -10,6 +10,7 @@ import {
 } from '@/lib/time'
 import { useCountdown } from '@/hooks/useCountdown'
 import { useGeolocation } from '@/hooks/useGeolocation'
+import { haversineKm } from '@/lib/tfnsw/vehiclePositions'
 import { VehicleMap } from './VehicleMap'
 
 const MODE_EMOJI: Record<string, string> = {
@@ -44,8 +45,10 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const gpsLat = geoState.status === 'granted' ? geoState.coords.lat : null
   const gpsLng = geoState.status === 'granted' ? geoState.coords.lng : null
 
+  // Only use live GPS walk time when near the stop (< 1 km); otherwise stored value is more useful
   useEffect(() => {
     if (!gpsLat || !gpsLng || !trip.lat || !trip.lng) return
+    if (haversineKm(gpsLat, gpsLng, trip.lat, trip.lng) > 1) return
     fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${trip.lat}&toLng=${trip.lng}`)
       .then(r => r.json())
       .then(d => { if (typeof d.walkMinutes === 'number') setWalkMins(d.walkMinutes) })
