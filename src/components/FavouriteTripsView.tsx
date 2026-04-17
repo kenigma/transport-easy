@@ -38,20 +38,27 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   useCountdown(10_000)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
-  const [walkMins, setWalkMins] = useState<number | null>(null)
+  const [orsWalkMins, setOrsWalkMins] = useState<number | null>(null)
   const { state: geoState } = useGeolocation()
 
-  // Always compute live walk time from current GPS position to stop
   const gpsLat = geoState.status === 'granted' ? geoState.coords.lat : null
   const gpsLng = geoState.status === 'granted' ? geoState.coords.lng : null
 
+  // Immediate haversine estimate (~5 km/h walking) — works without any API
+  const haversineWalkMins = gpsLat && gpsLng && trip.lat && trip.lng
+    ? Math.round(haversineKm(gpsLat, gpsLng, trip.lat, trip.lng) * 12)
+    : null
+
+  // ORS gives a more accurate routed walk time; falls back to haversine if unavailable
   useEffect(() => {
     if (!gpsLat || !gpsLng || !trip.lat || !trip.lng) return
     fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${trip.lat}&toLng=${trip.lng}`)
       .then(r => r.json())
-      .then(d => { if (typeof d.walkMinutes === 'number') setWalkMins(d.walkMinutes) })
+      .then(d => { if (typeof d.walkMinutes === 'number') setOrsWalkMins(d.walkMinutes) })
       .catch(() => {})
   }, [gpsLat, gpsLng, trip.lat, trip.lng])
+
+  const walkMins = orsWalkMins ?? haversineWalkMins
 
   // Only apply reachability/urgency logic when walk time is actionable (nearby)
   const actionableWalk = walkMins !== null && walkMins < 30 ? walkMins : 0
