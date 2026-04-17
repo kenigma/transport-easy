@@ -53,7 +53,6 @@ export function urgencyWithWalk(mins: number, walkMinutes: number): UrgencyLevel
 
 /** Human-readable action message for the primary departure in My Trips. */
 export function humanMessage(mins: number, walkMinutes: number): string {
-  if (walkMinutes === 0) return formatCountdown(mins)
   const margin = mins - walkMinutes
   if (margin < 0) return 'Run!'
   if (margin === 0) return 'Head out now!'
