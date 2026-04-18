@@ -11,7 +11,8 @@ import {
 import { useCountdown } from '@/hooks/useCountdown'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { haversineKm } from '@/lib/tfnsw/vehiclePositions'
-import { VehicleMap } from './VehicleMap'
+import { TimetableSheet } from './TimetableSheet'
+import { WalkMap } from './WalkMap'
 
 const MODE_EMOJI: Record<string, string> = {
   train: '🚆', metro: '🚇', bus: '🚌', ferry: '⛴️', lightrail: '🚊', coach: '🚍', unknown: '🚌',
@@ -36,7 +37,8 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   onPrimaryMinsChange?: (id: string, mins: number | null) => void
 }) {
   useCountdown(10_000)
-  const [showVehicleMap, setShowVehicleMap] = useState(false)
+  const [showTimetable, setShowTimetable] = useState(false)
+  const [showWalkMap, setShowWalkMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [orsWalkMins, setOrsWalkMins] = useState<number | null>(null)
   const { state: geoState } = useGeolocation()
@@ -84,22 +86,6 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
     ? (walkMins !== null ? humanMessage(primaryMins, actionableWalk) : formatCountdown(primaryMins))
     : null
 
-  const onBoard = (() => {
-    if (!trip.travelMinutes) return null
-    const candidates = allDepartures.filter((dep) => {
-      if (dep.isCancelled) return false
-      const mins = minutesUntil(effectiveTime(dep))
-      return mins < 0 && Math.abs(mins) < trip.travelMinutes!
-    })
-    if (candidates.length === 0) return null
-    candidates.sort((a, b) => minutesUntil(effectiveTime(b)) - minutesUntil(effectiveTime(a)))
-    return candidates[0]
-  })()
-
-  const onBoardArrival = onBoard
-    ? new Date(new Date(effectiveTime(onBoard)).getTime() + trip.travelMinutes! * 60_000).toISOString()
-    : null
-
   useEffect(() => {
     if (!isLoading && onPrimaryMinsChange) {
       onPrimaryMinsChange(trip.id, primaryMins)
@@ -107,150 +93,149 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   }, [primaryMins, isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Card header */}
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-500 truncate">
-              {MODE_EMOJI[trip.mode] ?? '🚌'} {normalizeStopName(trip.stopName)}
-            </p>
-            <h2 className="text-base font-semibold text-gray-900 leading-snug">
-              → {normalizeStopName(trip.userDestination ?? trip.destination)}
-            </h2>
-            {trip.lineName && (
-              <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
-            )}
-            {trip.userDestination && (
-              <p className="text-xs text-gray-400 mt-0.5 truncate">via {trip.destination} service</p>
-            )}
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {primary?.estimatedDepartureTime && !primary.isCancelled && (
-              <button
-                onClick={() => setShowVehicleMap(true)}
-                className="text-base p-1 text-gray-400 active:text-tfnsw-blue"
-                aria-label="Show live vehicle location"
-              >
-                🗺️
-              </button>
-            )}
-            {trip.lat && trip.lng ? (
-              <a
-                href={`https://maps.apple.com/?q=${encodeURIComponent(normalizeStopName(trip.stopName))}&ll=${trip.lat},${trip.lng}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-base p-1"
-                aria-label="Open in Maps"
-                onClick={(e) => e.stopPropagation()}
-              >
-                📍
-              </a>
-            ) : null}
-            {confirmingRemove ? (
-              <div className="flex items-center gap-1">
+    <>
+      <div
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer active:bg-gray-50"
+        onClick={() => setShowTimetable(true)}
+      >
+        {/* Card header */}
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-500 truncate">
+                {MODE_EMOJI[trip.mode] ?? '🚌'} {normalizeStopName(trip.stopName)}
+              </p>
+              <h2 className="text-base font-semibold text-gray-900 leading-snug">
+                → {normalizeStopName(trip.userDestination ?? trip.destination)}
+              </h2>
+              {trip.lineName && (
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
+              )}
+              {trip.userDestination && (
+                <p className="text-xs text-gray-400 mt-0.5 truncate">via {trip.destination} service</p>
+              )}
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {trip.lat && trip.lng && gpsLat && gpsLng ? (
                 <button
-                  onClick={() => onRemove(trip.id)}
-                  className="text-xs font-medium text-white bg-red-500 rounded-full px-2 py-0.5"
+                  onClick={(e) => { e.stopPropagation(); setShowWalkMap(true) }}
+                  className="text-base p-1 text-gray-400 active:text-tfnsw-blue"
+                  aria-label="Show walk to stop"
                 >
-                  Remove
+                  📍
                 </button>
+              ) : null}
+              {confirmingRemove ? (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => onRemove(trip.id)}
+                    className="text-xs font-medium text-white bg-red-500 rounded-full px-2 py-0.5"
+                  >
+                    Remove
+                  </button>
+                  <button
+                    onClick={() => setConfirmingRemove(false)}
+                    className="text-xs text-gray-400 px-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={() => setConfirmingRemove(false)}
-                  className="text-xs text-gray-400 px-1"
+                  onClick={(e) => { e.stopPropagation(); setConfirmingRemove(true) }}
+                  className="text-tfnsw-blue text-base p-1"
+                  aria-label="Remove from favourites"
                 >
-                  Cancel
+                  ★
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmingRemove(true)}
-                className="text-tfnsw-blue text-base p-1"
-                aria-label="Remove from favourites"
-              >
-                ★
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Live walk time */}
-        {walkMins !== null && walkMins > 0 && (
-          <p className="mt-2 text-xs text-gray-400">🚶 {walkMins} min walk</p>
-        )}
-      </div>
-
-      {showVehicleMap && (
-        <VehicleMap
-          stopLat={trip.lat}
-          stopLng={trip.lng}
-          stopName={trip.stopName}
-          serviceId={trip.serviceId}
-          destination={trip.destination}
-          mode={trip.mode}
-          onClose={() => setShowVehicleMap(false)}
-        />
-      )}
-
-      {/* Departures */}
-      <div className="px-4 pb-3 border-t border-gray-50">
-        {isLoading && (
-          <div className="space-y-2 pt-3">
-            <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
-            <div className="h-6 bg-gray-100 rounded-xl animate-pulse w-2/3" />
-          </div>
-        )}
-
-        {error && (
-          <p className="pt-3 text-sm text-gray-400">Could not load departures.</p>
-        )}
-
-        {!isLoading && !error && primary === null && onBoard === null && (
-          <p className="pt-3 text-sm text-gray-400">
-            No reachable services right now.
-          </p>
-        )}
-
-        {primary !== null && (
-          <div className="flex items-center gap-3 pt-3">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold min-w-[5rem] justify-center ${URGENCY_STYLES[primaryLevel]}`}>
-              {primaryMessage}
-            </span>
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{primary.serviceId} · {formatCountdown(primaryMins!)}</span>
-              <span className="text-gray-400 ml-1">· {formatClockTime(effectiveTime(primary))}</span>
-              {trip.travelMinutes != null && (
-                <span className="text-gray-400 ml-1">
-                  → {formatClockTime(new Date(new Date(effectiveTime(primary)).getTime() + trip.travelMinutes * 60_000).toISOString())}
-                </span>
               )}
             </div>
           </div>
-        )}
 
-        {secondary.length > 0 && (
-          <div className="flex gap-3 mt-2">
-            {secondary.map((dep, i) => {
-              const mins = minutesUntil(effectiveTime(dep))
-              return (
-                <span key={`${dep.scheduledDepartureTime}-${i}`} className="text-xs text-gray-400">
-                  {i === 0 ? 'Then' : '·'} {dep.serviceId} {formatCountdown(mins)} · {formatClockTime(effectiveTime(dep))}
-                </span>
-              )
-            })}
-          </div>
-        )}
+          {/* Live walk time */}
+          {walkMins !== null && walkMins > 0 && (
+            <p className="mt-2 text-xs text-gray-400">🚶 {walkMins} min walk</p>
+          )}
+        </div>
 
-        {onBoard && onBoardArrival && (
-          <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-xl border border-blue-100">
-            <span className="text-base">🚉</span>
-            <p className="text-sm text-blue-700 font-medium">
-              On board · arrives {normalizeStopName(trip.userDestination ?? trip.destination)} {formatClockTime(onBoardArrival)}
-            </p>
-          </div>
-        )}
+        {/* Departures */}
+        <div className="px-4 pb-3 border-t border-gray-50">
+          {isLoading && (
+            <div className="space-y-2 pt-3">
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-6 bg-gray-100 rounded-xl animate-pulse w-2/3" />
+            </div>
+          )}
+
+          {error && (
+            <p className="pt-3 text-sm text-gray-400">Could not load departures.</p>
+          )}
+
+          {!isLoading && !error && primary === null && (
+            <p className="pt-3 text-sm text-gray-400">No reachable services right now.</p>
+          )}
+
+          {primary !== null && (
+            <div className="flex items-center gap-3 pt-3">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold min-w-[5rem] justify-center ${URGENCY_STYLES[primaryLevel]}`}>
+                {primaryMessage}
+              </span>
+              <div className="text-sm text-gray-600">
+                <span className="font-semibold text-gray-900">{primary.serviceId} · {formatCountdown(primaryMins!)}</span>
+                <span className="text-gray-400 ml-1">· {formatClockTime(effectiveTime(primary))}</span>
+                {trip.travelMinutes != null && (
+                  <span className="text-gray-400 ml-1">
+                    → {formatClockTime(new Date(new Date(effectiveTime(primary)).getTime() + trip.travelMinutes * 60_000).toISOString())}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {secondary.length > 0 && (
+            <div className="flex gap-3 mt-2">
+              {secondary.map((dep, i) => {
+                const mins = minutesUntil(effectiveTime(dep))
+                return (
+                  <span key={`${dep.scheduledDepartureTime}-${i}`} className="text-xs text-gray-400">
+                    {i === 0 ? 'Then' : '·'} {dep.serviceId} {formatCountdown(mins)} · {formatClockTime(effectiveTime(dep))}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+
+          <p className="mt-2 text-xs text-gray-300">Tap for full timetable ›</p>
+        </div>
       </div>
-    </div>
+
+      {showTimetable && (
+        <TimetableSheet
+          stopId={trip.stopId}
+          stopName={trip.stopName}
+          serviceId={trip.serviceId}
+          destination={trip.userDestination ?? trip.destination}
+          mode={trip.mode}
+          stopLat={trip.lat}
+          stopLng={trip.lng}
+          gpsLat={gpsLat}
+          gpsLng={gpsLng}
+          travelMinutes={trip.travelMinutes}
+          onClose={() => setShowTimetable(false)}
+        />
+      )}
+
+      {showWalkMap && gpsLat && gpsLng && trip.lat && trip.lng && (
+        <WalkMap
+          stopLat={trip.lat}
+          stopLng={trip.lng}
+          stopName={normalizeStopName(trip.stopName)}
+          userLat={gpsLat}
+          userLng={gpsLng}
+          onClose={() => setShowWalkMap(false)}
+        />
+      )}
+    </>
   )
 }
 

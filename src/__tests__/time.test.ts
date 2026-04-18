@@ -142,29 +142,31 @@ describe('urgencyWithWalk', () => {
 // ── humanMessage ──────────────────────────────────────────────────────────────
 
 describe('humanMessage', () => {
-  it('delegates to formatCountdown when walk time is 0', () => {
-    expect(humanMessage(5, 0)).toBe('5 min')
-    expect(humanMessage(0, 0)).toBe('Now')
-    expect(humanMessage(-1, 0)).toBe('Departed')
-  })
-
-  it('returns Run! when departure is before walk time', () => {
+  it('returns Run! when departure is before walk time (negative margin)', () => {
     expect(humanMessage(5, 10)).toBe('Run!')
     expect(humanMessage(0, 5)).toBe('Run!')
+    // Also Run! when at stop (walk=0) and departure has passed
+    expect(humanMessage(-1, 0)).toBe('Run!')
   })
 
   it('returns Head out now! when margin is exactly 0', () => {
     expect(humanMessage(10, 10)).toBe('Head out now!')
+    // At stop with imminent departure (0 min away, 0 walk)
+    expect(humanMessage(0, 0)).toBe('Head out now!')
   })
 
   it('returns Leave in X min when margin is 1–4', () => {
     expect(humanMessage(11, 10)).toBe('Leave in 1 min')
     expect(humanMessage(14, 10)).toBe('Leave in 4 min')
+    // At stop: margin = mins - 0 = mins
+    expect(humanMessage(2, 0)).toBe('Leave in 2 min')
   })
 
   it('returns Relax when margin is 5+', () => {
     expect(humanMessage(15, 10)).toBe('Relax, take your time')
     expect(humanMessage(30, 5)).toBe('Relax, take your time')
+    // At stop with plenty of time
+    expect(humanMessage(10, 0)).toBe('Relax, take your time')
   })
 })
 

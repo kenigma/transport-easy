@@ -1,6 +1,6 @@
 import { tfnswFetch } from './client'
 import { getSydneyItdParams } from '../time'
-import type { Departure, TransportMode } from '../types'
+import type { Departure, StopOnRoute, TransportMode } from '../types'
 
 const PRODUCT_CLASS_MAP: Record<number, TransportMode> = {
   1: 'train',
@@ -32,17 +32,22 @@ function parseOccupancy(raw: string | undefined): OccupancyStatus {
 interface RawStopEvent {
   departureTimePlanned?: string
   departureTimeEstimated?: string
+  arrivalTimePlanned?: string
   realtimeStatus?: string[]
   isRealtimeControlled?: boolean
   location?: {
+    id?: string
+    name?: string
     properties?: { platformName?: string; plannedPlatformName?: string }
   }
   transportation?: {
+    id?: string
     disassembledName?: string
     number?: string
-    destination?: { name?: string }
+    destination?: { name?: string; id?: string }  // id = terminal stop ID
     product?: { class?: number }
     iconId?: number
+    properties?: { gtfsId?: string }
   }
   properties?: { OccupancyStatus?: string }
 }
@@ -57,10 +62,15 @@ interface RawStopEvent {
 export async function getDepartures(
   stopId: string,
   maxDepartures = 5,
-  maxPastMinutes = 1
+  maxPastMinutes = 1,
+  futureMinutes = 90,
 ): Promise<Departure[]> {
   const now = new Date()
-  const { itdDate, itdTime } = getSydneyItdParams(now)
+  // Offset query start time so the API returns departures going back maxPastMinutes
+  const queryTime = maxPastMinutes > 1
+    ? new Date(now.getTime() - maxPastMinutes * 60_000)
+    : now
+  const { itdDate, itdTime } = getSydneyItdParams(queryTime)
 
   const data = await tfnswFetch('/tp/departure_mon', {
     outputFormat: 'rapidJSON',
@@ -84,7 +94,7 @@ export async function getDepartures(
       const t = e.departureTimeEstimated ?? e.departureTimePlanned
       if (!t) return false
       const diffMin = (new Date(t).getTime() - nowMs) / 60_000
-      return diffMin > -maxPastMinutes && diffMin < 90
+      return diffMin > -maxPastMinutes && diffMin < futureMinutes
     })
     .slice(0, maxDepartures)
     .map((e): Departure => {
@@ -112,8 +122,85 @@ export async function getDepartures(
         mode: productClassToMode(productClass),
         isCancelled,
         occupancy: parseOccupancy(e.properties?.OccupancyStatus),
+        tripId: transport.properties?.gtfsId ?? null,
+        terminalStopId: transport.destination?.id ?? null,
       }
     })
 
   return departures
+}
+
+interface RawTripLegStop {
+  id?: string
+  name?: string
+  departureTimePlanned?: string
+  departureTimeEstimated?: string
+  arrivalTimePlanned?: string
+  properties?: { platformName?: string }
+}
+
+interface RawTripLeg {
+  isFootPath?: boolean
+  transportation?: { disassembledName?: string }
+  origin?: RawTripLegStop
+  stopSequence?: RawTripLegStop[]
+  realtimeStatus?: string[]
+}
+
+/**
+ * Fetches the full stop sequence for a specific departure using the TfNSW
+ * Trip Planner API. Queries from the boarding stop to the terminal stop at
+ * the scheduled departure time, then finds the leg matching the service ID.
+ */
+export async function getTripStops(
+  boardingStopId: string,
+  terminalStopId: string,
+  scheduledDepartureTime: string,
+  serviceId: string,
+): Promise<StopOnRoute[]> {
+  const depDate = new Date(scheduledDepartureTime)
+  const { itdDate, itdTime } = getSydneyItdParams(depDate)
+  const depMs = depDate.getTime()
+
+  const data = await tfnswFetch('/tp/trip', {
+    outputFormat: 'rapidJSON',
+    coordOutputFormat: 'EPSG:4326',
+    type_origin: 'stop',
+    name_origin: boardingStopId,
+    isGlobalId: '1',
+    type_destination: 'stop',
+    name_destination: terminalStopId,
+    itdDate,
+    itdTime,
+    depArrMacro: 'dep',
+    calcNumberOfTrips: '5',
+    TfNSWTR: 'true',
+    version: '10.2.2.48',
+  }) as { journeys?: Array<{ legs?: RawTripLeg[] }> }
+
+  for (const journey of data.journeys ?? []) {
+    for (const leg of journey.legs ?? []) {
+      if (leg.isFootPath) continue
+      if (leg.transportation?.disassembledName !== serviceId) continue
+      const legDep = leg.origin?.departureTimePlanned
+      if (!legDep) continue
+      // Match within 10 minutes of the scheduled departure
+      if (Math.abs(new Date(legDep).getTime() - depMs) > 10 * 60_000) continue
+
+      // Found — return the stopSequence (includes origin + all intermediate stops + destination)
+      return (leg.stopSequence ?? []).map((s): StopOnRoute => ({
+        stopId: s.id ?? '',
+        stopName: s.name ?? 'Unknown',
+        plannedDeparture: s.departureTimePlanned ?? null,
+        plannedArrival: s.arrivalTimePlanned ?? null,
+        estimatedDeparture: s.departureTimeEstimated ?? null,
+        isCancelled: leg.realtimeStatus?.includes('CANCELLED') ?? false,
+        platformName: s.properties?.platformName && s.properties.platformName !== '0'
+          ? s.properties.platformName
+          : null,
+      }))
+    }
+  }
+
+  return []
 }

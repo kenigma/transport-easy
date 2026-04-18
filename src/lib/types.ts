@@ -19,6 +19,18 @@ export interface Departure {
   mode: TransportMode
   isCancelled: boolean
   occupancy: 'empty' | 'many_seats' | 'few_seats' | 'full' | null
+  tripId: string | null        // GTFS trip ID (gtfsId from transportation.properties)
+  terminalStopId: string | null  // TfNSW stop ID of the service terminal — used to fetch stop sequence
+}
+
+export interface StopOnRoute {
+  stopId: string
+  stopName: string
+  plannedDeparture: string | null   // null at terminal stop
+  plannedArrival: string | null     // null at first stop
+  estimatedDeparture: string | null
+  isCancelled: boolean
+  platformName: string | null
 }
 
 export interface GeocodeResult {
