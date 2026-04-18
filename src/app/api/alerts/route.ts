@@ -29,10 +29,14 @@ export async function GET(req: NextRequest) {
       headers: { 'X-Cache': 'MISS', 'Cache-Control': 'no-store' },
     })
   } catch (err) {
+    // 401 = API key doesn't have GTFS-RT alerts access — return empty silently
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.includes('401')) {
+      const empty: AlertsResponse = { alerts: [], fetchedAt: new Date().toISOString() }
+      cacheSet(cacheKey, empty, CACHE_TTL_MS)
+      return NextResponse.json(empty)
+    }
     console.error('[/api/alerts]', err)
-    return NextResponse.json(
-      { error: 'Failed to fetch alerts.' },
-      { status: 502 }
-    )
+    return NextResponse.json({ error: 'Failed to fetch alerts.' }, { status: 502 })
   }
 }
