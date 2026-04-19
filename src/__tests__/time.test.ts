@@ -163,10 +163,10 @@ describe('humanMessage', () => {
   })
 
   it('returns Relax when margin is 5+', () => {
-    expect(humanMessage(15, 10)).toBe('Relax, take your time')
-    expect(humanMessage(30, 5)).toBe('Relax, take your time')
+    expect(humanMessage(15, 10)).toBe('Relax')
+    expect(humanMessage(30, 5)).toBe('Relax')
     // At stop with plenty of time
-    expect(humanMessage(10, 0)).toBe('Relax, take your time')
+    expect(humanMessage(10, 0)).toBe('Relax')
   })
 })
 

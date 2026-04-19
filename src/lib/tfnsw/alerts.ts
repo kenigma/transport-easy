@@ -39,7 +39,7 @@ function effectToSeverity(effect: string | undefined): Alert['severity'] {
  * Fetches active service alerts, optionally filtered to the given stop IDs.
  */
 export async function getAlerts(stopIds: string[] = []): Promise<Alert[]> {
-  const data = await tfnswFetch('/gtfs/alerts/sydneytrains', {}) as {
+  const data = await tfnswFetch('/gtfs/alerts/sydneytrains', {}, 'v2') as {
     entity?: Array<{ alert?: RawAlert }>
   }
 

@@ -282,7 +282,7 @@ describe('humanMessage — at the stop (walkMinutes = 0)', () => {
   })
 
   it('returns Relax for margin 5+', () => {
-    expect(humanMessage(5, 0)).toBe('Relax, take your time')
-    expect(humanMessage(15, 0)).toBe('Relax, take your time')
+    expect(humanMessage(5, 0)).toBe('Relax')
+    expect(humanMessage(15, 0)).toBe('Relax')
   })
 })

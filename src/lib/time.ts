@@ -57,7 +57,7 @@ export function humanMessage(mins: number, walkMinutes: number): string {
   if (margin < 0) return 'Run!'
   if (margin === 0) return 'Head out now!'
   if (margin < 5) return `Leave in ${margin} min`
-  return 'Relax, take your time'
+  return 'Relax'
 }
 
 /**

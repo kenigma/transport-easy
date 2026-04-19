@@ -1,7 +1,7 @@
 import { transit_realtime } from 'gtfs-realtime-bindings'
 import type { TransportMode, VehiclePosition } from '../types'
 
-const BASE_URL = 'https://api.transport.nsw.gov.au/v1'
+const BASE_URL = 'https://api.transport.nsw.gov.au/v2'
 
 // TfNSW GTFS Realtime vehicle positions — only available for modes that
 // broadcast GPS positions. Trains use EFA-based realtime (departure_mon),

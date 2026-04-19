@@ -83,7 +83,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const primaryMins = primary ? minutesUntil(effectiveTime(primary)) : null
   const primaryLevel = primaryMins !== null ? urgencyWithWalk(primaryMins, actionableWalk) : 'departed'
   const primaryMessage = primaryMins !== null
-    ? (walkMins !== null ? humanMessage(primaryMins, actionableWalk) : formatCountdown(primaryMins))
+    ? (walkMins !== null && walkMins < 30 ? humanMessage(primaryMins, actionableWalk) : formatCountdown(primaryMins))
     : null
 
   useEffect(() => {
