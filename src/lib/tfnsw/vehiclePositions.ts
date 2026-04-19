@@ -1,17 +1,16 @@
 import { transit_realtime } from 'gtfs-realtime-bindings'
 import type { TransportMode, VehiclePosition } from '../types'
 
-const BASE_URL = 'https://api.transport.nsw.gov.au/v2'
+const BASE_URL = 'https://api.transport.nsw.gov.au/v1'
 
-// TfNSW GTFS Realtime vehicle positions — only available for modes that
-// broadcast GPS positions. Trains use EFA-based realtime (departure_mon),
-// not GTFS-R vehicle positions, so 'train' is intentionally absent.
+// TfNSW GTFS Realtime vehicle positions — provider names confirmed working
+// with the Trip Planner API key on v1.
+// Ferry and coach feeds return 404 (separate subscription required).
 const MODE_TO_PROVIDER: Partial<Record<TransportMode, string>> = {
   bus:       'buses',
+  train:     'nswtrains',
   metro:     'metro',
   lightrail: 'lightrail',
-  ferry:     'ferries',
-  coach:     'coaches',
 }
 
 /**

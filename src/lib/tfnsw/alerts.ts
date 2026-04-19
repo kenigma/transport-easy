@@ -1,79 +1,89 @@
-import { tfnswFetch } from './client'
+import { transit_realtime } from 'gtfs-realtime-bindings'
 import type { Alert, TransportMode } from '../types'
 
-const MODE_MAP: Record<string, TransportMode> = {
-  BUS: 'bus',
-  TRAIN: 'train',
-  METRO: 'metro',
-  FERRY: 'ferry',
-  LIGHTRAIL: 'lightrail',
-  COACH: 'coach',
+const ALERTS_URL = 'https://api.transport.nsw.gov.au/v2/gtfs/alerts/sydneytrains'
+
+// GTFS route_type → TransportMode
+const ROUTE_TYPE_MAP: Record<number, TransportMode> = {
+  0: 'lightrail',
+  1: 'metro',
+  2: 'train',
+  3: 'bus',
+  4: 'ferry',
 }
 
-interface RawAlert {
-  id?: string
-  headerText?: { translation?: Array<{ text?: string }> }
-  descriptionText?: { translation?: Array<{ text?: string }> }
-  url?: { translation?: Array<{ text?: string }> }
-  effect?: string
-  informedEntity?: Array<{
-    stopId?: string
-    routeType?: string
-    routeId?: string
-  }>
-}
-
-function getText(field: RawAlert['headerText']): string {
-  return field?.translation?.[0]?.text ?? ''
-}
-
-function effectToSeverity(effect: string | undefined): Alert['severity'] {
+function effectToSeverity(effect: transit_realtime.Alert.Effect | null | undefined): Alert['severity'] {
   if (!effect) return 'info'
-  const e = effect.toUpperCase()
-  if (e.includes('NO_SERVICE') || e.includes('SIGNIFICANT')) return 'disruption'
-  if (e.includes('REDUCED') || e.includes('DETOUR') || e.includes('MODIFIED')) return 'warning'
+  if (
+    effect === transit_realtime.Alert.Effect.NO_SERVICE ||
+    effect === transit_realtime.Alert.Effect.SIGNIFICANT_DELAYS
+  ) return 'disruption'
+  if (
+    effect === transit_realtime.Alert.Effect.REDUCED_SERVICE ||
+    effect === transit_realtime.Alert.Effect.DETOUR ||
+    effect === transit_realtime.Alert.Effect.MODIFIED_SERVICE
+  ) return 'warning'
   return 'info'
 }
 
+function getTranslation(text: transit_realtime.ITranslatedString | null | undefined): string {
+  return text?.translation?.[0]?.text ?? ''
+}
+
 /**
- * Fetches active service alerts, optionally filtered to the given stop IDs.
+ * Fetches active service alerts from the TfNSW GTFS Realtime v2 feed.
+ * Response is protobuf binary — parsed with gtfs-realtime-bindings.
+ * Optionally filtered to alerts affecting the given stop IDs.
  */
 export async function getAlerts(stopIds: string[] = []): Promise<Alert[]> {
-  const data = await tfnswFetch('/gtfs/alerts/sydneytrains', {}, 'v2') as {
-    entity?: Array<{ alert?: RawAlert }>
+  const apiKey = process.env.TFNSW_API_KEY
+  if (!apiKey) throw new Error('TFNSW_API_KEY environment variable is not set')
+
+  const res = await fetch(ALERTS_URL, {
+    headers: { Authorization: `apikey ${apiKey}` },
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    throw new Error(`TfNSW alerts error ${res.status}: ${await res.text()}`)
   }
 
-  const entities = data?.entity ?? []
+  const buffer = await res.arrayBuffer()
+  const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer))
 
-  return entities
-    .map((e): Alert | null => {
-      const raw = e.alert
+  return (feed.entity ?? [])
+    .map((entity): Alert | null => {
+      const raw = entity.alert
       if (!raw) return null
 
-      const affectedStopIds = (raw.informedEntity ?? [])
+      const informed = raw.informedEntity ?? []
+
+      const affectedStopIds = informed
         .map((ie) => ie.stopId)
         .filter((id): id is string => !!id)
 
-      // If stopIds filter provided, skip alerts not matching any
       if (stopIds.length > 0 && !affectedStopIds.some((id) => stopIds.includes(id))) {
         return null
       }
 
       const affectedModes: TransportMode[] = Array.from(new Set(
-        (raw.informedEntity ?? [])
-          .map((ie) => MODE_MAP[ie.routeType?.toUpperCase() ?? ''] ?? null)
+        informed
+          .map((ie) => ROUTE_TYPE_MAP[ie.routeType ?? -1] ?? null)
           .filter((m): m is TransportMode => m !== null)
       ))
 
+      const title = getTranslation(raw.headerText)
+      if (!title) return null
+
       return {
-        id: raw.id ?? Math.random().toString(36),
-        title: getText(raw.headerText),
-        description: getText(raw.descriptionText),
+        id: entity.id ?? Math.random().toString(36),
+        title,
+        description: getTranslation(raw.descriptionText),
         affectedModes,
         affectedStopIds,
         severity: effectToSeverity(raw.effect),
-        url: getText(raw.url) || null,
+        url: getTranslation(raw.url) || null,
       }
     })
-    .filter((a): a is Alert => a !== null && !!a.title)
+    .filter((a): a is Alert => a !== null)
 }

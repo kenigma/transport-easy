@@ -11,16 +11,14 @@ const BASE_URL = 'https://api.transport.nsw.gov.au/v1'
  */
 export async function tfnswFetch(
   path: string,
-  params: Record<string, string> = {},
-  version: 'v1' | 'v2' = 'v1'
+  params: Record<string, string> = {}
 ): Promise<unknown> {
   const apiKey = process.env.TFNSW_API_KEY
   if (!apiKey) {
     throw new Error('TFNSW_API_KEY environment variable is not set')
   }
 
-  const base = BASE_URL.replace('/v1', `/${version}`)
-  const url = new URL(`${base}${path}`)
+  const url = new URL(`${BASE_URL}${path}`)
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value)
   }
