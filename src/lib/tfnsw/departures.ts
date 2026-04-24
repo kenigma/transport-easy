@@ -100,7 +100,9 @@ export async function getDepartures(
     .map((e): Departure => {
       const transport = e.transportation ?? {}
       const productClass = transport.product?.class ?? transport.iconId ?? 5
-      const isCancelled = e.realtimeStatus?.includes('CANCELLED') ?? false
+      // EFA reports 'TRIP_CANCELLED' (or 'STOP_CANCELLED') as array elements —
+      // substring match so we catch both, and any future variants.
+      const isCancelled = e.realtimeStatus?.some((s) => s.includes('CANCELLED')) ?? false
 
       // Use disassembledName (e.g. "T4", "M1", "380") — falls back to number
       const serviceId = transport.disassembledName ?? transport.number ?? '?'
@@ -194,7 +196,7 @@ export async function getTripStops(
         plannedDeparture: s.departureTimePlanned ?? null,
         plannedArrival: s.arrivalTimePlanned ?? null,
         estimatedDeparture: s.departureTimeEstimated ?? null,
-        isCancelled: leg.realtimeStatus?.includes('CANCELLED') ?? false,
+        isCancelled: leg.realtimeStatus?.some((s) => s.includes('CANCELLED')) ?? false,
         platformName: s.properties?.platformName && s.properties.platformName !== '0'
           ? s.properties.platformName
           : null,
