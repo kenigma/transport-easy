@@ -198,7 +198,9 @@ export async function GET(req: NextRequest) {
       destinationName: toName,
       fetchedAt: new Date().toISOString(),
     }
-    cacheSet(cacheKey, response, CACHE_TTL_MS)
+    // Don't cache empty results — likely a transient TfNSW/timeout failure;
+    // caching would pin an empty options list on this instance for an hour.
+    if (options.length > 0) cacheSet(cacheKey, response, CACHE_TTL_MS)
     return NextResponse.json(response, { headers: { 'X-Cache': 'MISS', 'Cache-Control': 'no-store' } })
   } catch (err) {
     console.error('[/api/trip-options]', err)
