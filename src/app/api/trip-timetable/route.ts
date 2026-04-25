@@ -54,7 +54,12 @@ export async function GET(req: NextRequest) {
     // Query 10 time slots across the day in parallel for broad coverage
     const slots = [4, 6, 8, 10, 12, 14, 16, 18, 20, 22].map((h) => sydneyDateAtHour(h, date))
     const results = await Promise.all(
-      slots.map((dt) => getTrip(fromLat, fromLng, toLat, toLng, dt, 5).catch(() => [] as Journey[]))
+      slots.map((dt, i) =>
+        getTrip(fromLat, fromLng, toLat, toLng, dt, 5).catch((err) => {
+          console.warn(`[/api/trip-timetable] slot ${i} (${dt.toISOString()}) failed:`, err?.message ?? err)
+          return [] as Journey[]
+        })
+      )
     )
     const allJourneys = results.flat()
 

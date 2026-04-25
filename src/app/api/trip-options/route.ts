@@ -92,9 +92,17 @@ export async function GET(req: NextRequest) {
     const slots = [7, 10, 13, 16, 19].map((h) => sydneyDateAtHour(h))
     const [slotResults, nearbyStops] = await Promise.all([
       Promise.all(
-        slots.map((dt) => getTrip(fromLat, fromLng, toLat, toLng, dt, 10, Object.keys(stopExtraParams).length ? stopExtraParams : undefined).catch(() => [] as Journey[]))
+        slots.map((dt, i) =>
+          getTrip(fromLat, fromLng, toLat, toLng, dt, 10, Object.keys(stopExtraParams).length ? stopExtraParams : undefined).catch((err) => {
+            console.warn(`[/api/trip-options] slot ${i} (${dt.toISOString()}) failed:`, err?.message ?? err)
+            return [] as Journey[]
+          })
+        )
       ),
-      findNearbyStops(fromLat, fromLng, 1500, 30).catch(() => []),
+      findNearbyStops(fromLat, fromLng, 1500, 30).catch((err) => {
+        console.warn('[/api/trip-options] findNearbyStops failed:', err?.message ?? err)
+        return []
+      }),
     ])
     const allJourneys: Journey[] = slotResults.flat()
 
@@ -134,7 +142,10 @@ export async function GET(req: NextRequest) {
         Array.from(modesToSupplement.entries()).map(([mode, stop]) => {
           console.log(`[trip-options] supplemental ${mode} from "${stop.isPure ? 'pure' : 'combined'}" stop (${stop.lat}, ${stop.lng})`)
           return getTrip(stop.lat, stop.lng, toLat, toLng, sydneyDateAtHour(8), 5)
-            .catch(() => [] as Journey[])
+            .catch((err) => {
+              console.warn(`[/api/trip-options] supplemental ${mode} failed:`, err?.message ?? err)
+              return [] as Journey[]
+            })
         })
       )
       const supplementalJourneys = supplementalResults.flat()
