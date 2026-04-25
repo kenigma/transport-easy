@@ -52,12 +52,22 @@ export function HomeContent() {
               ? { lat: manualLocation.lat, lng: manualLocation.lng }
               : gpsCoords
 
-            const nearbyTrips = trips.filter(
-              (t) => t.lat && t.lng && haversineKm(coords.lat, coords.lng, t.lat, t.lng) < NEARBY_THRESHOLD_KM
-            )
-            const otherTrips = trips.filter(
-              (t) => !t.lat || !t.lng || haversineKm(coords.lat, coords.lng, t.lat, t.lng) >= NEARBY_THRESHOLD_KM
-            )
+            // A trip is "nearby" if EITHER endpoint is within walking range —
+            // the GPS-aware FavouriteTripCard will auto-orient with the closer
+            // one as the source, so both directions need to surface here.
+            const isNearby = (t: typeof trips[number]) => {
+              const closest = Math.min(
+                t.endpointA.lat && t.endpointA.lng
+                  ? haversineKm(coords.lat, coords.lng, t.endpointA.lat, t.endpointA.lng)
+                  : Infinity,
+                t.endpointB?.lat && t.endpointB?.lng
+                  ? haversineKm(coords.lat, coords.lng, t.endpointB.lat, t.endpointB.lng)
+                  : Infinity
+              )
+              return closest < NEARBY_THRESHOLD_KM
+            }
+            const nearbyTrips = trips.filter(isNearby)
+            const otherTrips = trips.filter((t) => !isNearby(t))
 
             return (
               <div className="space-y-5">

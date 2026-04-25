@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import type { Departure } from '@/lib/types'
+import type { Departure, FavouriteTrip, StopResult, TripEndpoint } from '@/lib/types'
 import { UrgencyBadge } from './UrgencyBadge'
 import { TimetableSheet } from './TimetableSheet'
 import { VehicleMap } from './VehicleMap'
-import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import { useFavouriteTrips, tripPairId } from '@/hooks/useFavouriteTrips'
+import { normalizeStopName } from '@/lib/tfnsw/trip'
 
 const MODE_EMOJI: Record<string, string> = {
   train: '🚆',
@@ -28,35 +29,72 @@ interface Props {
 export function DepartureRow({ departure, stopId, stopName, stopLat, stopLng }: Props) {
   const [showTimetable, setShowTimetable] = useState(false)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
-  const { isFavourite, add, remove } = useFavouriteTrips()
+  const { trips, add, remove } = useFavouriteTrips()
 
-  const tripId = `${stopId}:${departure.destination}`
-  const saved = isFavourite(tripId)
+  // Match an existing favourite for this (stop, service, terminal) tuple.
+  // Trip pairs are symmetric so either endpoint may be the boarding stop;
+  // the other endpoint's name should fuzzy-match the line terminal.
+  const normalizedTerminal = normalizeStopName(departure.destination)
+  const existing: FavouriteTrip | null = trips.find((t) => {
+    if (t.serviceId !== departure.serviceId || t.mode !== departure.mode) return false
+    const a = t.endpointA
+    const b = t.endpointB
+    if (a.stopId === stopId && b && b.stopName.includes(normalizedTerminal)) return true
+    if (b?.stopId === stopId && a.stopName.includes(normalizedTerminal)) return true
+    return false
+  }) ?? null
+  const saved = existing !== null
 
   const emoji = MODE_EMOJI[departure.mode] ?? '🚌'
   const isRealTime = departure.estimatedDepartureTime !== null
   const showPlatform = departure.platformName && departure.platformName !== '0'
 
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (saved) {
-      remove(tripId)
-    } else {
-      add({
-        id: tripId,
-        stopId,
-        stopName,
-        serviceId: departure.serviceId,
-        lineName: departure.lineName,
-        destination: departure.destination,
-        mode: departure.mode,
-        walkMinutes: 0,
-        lat: stopLat,
-        lng: stopLng,
-        travelMinutes: null,
-        userDestination: null,
-      })
+  // Resolves the line terminal name to a stop via /api/stop-search so the
+  // saved trip can be a real location pair (and auto-orient by GPS).
+  // Returns null when no result of the right mode is found — caller saves
+  // a one-way favourite as a fallback.
+  async function resolveTerminal(): Promise<TripEndpoint | null> {
+    try {
+      const res = await fetch(`/api/stop-search?q=${encodeURIComponent(normalizedTerminal)}`)
+      if (!res.ok) return null
+      const data = await res.json() as { results?: StopResult[] }
+      const match = (data.results ?? []).find((r) => r.modes.includes(departure.mode))
+        ?? (data.results ?? [])[0]
+        ?? null
+      if (!match) return null
+      return {
+        stopId: match.stopId,
+        stopName: normalizeStopName(match.name),
+        lat: match.lat,
+        lng: match.lng,
+      }
+    } catch {
+      return null
     }
+  }
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (existing) {
+      remove(existing.id)
+      return
+    }
+    const endpointA: TripEndpoint = { stopId, stopName, lat: stopLat, lng: stopLng }
+    const endpointB = await resolveTerminal()
+    add({
+      id: tripPairId(endpointA, endpointB, departure.mode, departure.serviceId),
+      endpointA,
+      endpointB,
+      serviceId: departure.serviceId,
+      lineName: departure.lineName,
+      mode: departure.mode,
+      walkMinutes: 0,
+      travelMinutes: null,
+      // Keep the line terminal as a display label for the case where the
+      // stop-search above returned no match (endpointB null) — without it
+      // the card has nothing to render on the right side of the arrow.
+      terminalLabel: normalizedTerminal,
+    })
   }
 
   return (

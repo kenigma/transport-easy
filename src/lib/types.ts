@@ -29,8 +29,11 @@ export interface StopOnRoute {
   plannedDeparture: string | null   // null at terminal stop
   plannedArrival: string | null     // null at first stop
   estimatedDeparture: string | null
+  estimatedArrival: string | null
   isCancelled: boolean
   platformName: string | null
+  lat: number | null
+  lng: number | null
 }
 
 export interface GeocodeResult {
@@ -61,19 +64,32 @@ export interface Alert {
   url: string | null
 }
 
-export interface FavouriteTrip {
-  id: string           // unique key: `${stopId}:${serviceId}:${destination}`
+export interface TripEndpoint {
   stopId: string
   stopName: string
-  serviceId: string
-  lineName: string | null
-  destination: string
-  mode: TransportMode
-  walkMinutes: number  // minutes to walk to stop; 0 = no preference
   lat: number
   lng: number
-  travelMinutes: number | null  // scheduled travel time from stop to destination; null if unknown
-  userDestination: string | null  // user's actual alighting stop; null when destination already is their stop
+}
+
+export interface FavouriteTrip {
+  // Order-independent: sorted [endpointA.stopId, endpointB.stopId].join(':') when
+  // both endpoints are known; falls back to endpointA.stopId for legacy/Home-tab
+  // saves where the destination couldn't be resolved.
+  id: string
+  endpointA: TripEndpoint
+  // null when the Home-tab save couldn't resolve the line terminal to a stop;
+  // such trips render as one-way and skip the GPS auto-orient.
+  endpointB: TripEndpoint | null
+  serviceId: string
+  lineName: string | null
+  mode: TransportMode
+  walkMinutes: number             // walk to whichever endpoint is currently the source
+  travelMinutes: number | null    // scheduled travel time end-to-end; null if unknown
+  // Display-only fallback when endpointB is null (legacy / unresolved Home-tab
+  // saves): the line's terminal name as shown on the original departure row.
+  // Never participates in id / dedup. Optional so already-saved pair trips
+  // omit it.
+  terminalLabel?: string | null
 }
 
 // ── Trip Planner ──────────────────────────────────────────────────────────────
@@ -102,6 +118,10 @@ export interface TripLeg {
   stopLat: number | null
   stopLng: number | null
   legDestination: string | null
+  // Destination-side stop info — needed to save trips as symmetric location pairs
+  legDestinationStopId: string | null
+  legDestinationLat: number | null
+  legDestinationLng: number | null
 }
 
 export interface Journey {

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
-import type { FavouriteTrip, Departure } from '@/lib/types'
+import type { FavouriteTrip, Departure, TripEndpoint } from '@/lib/types'
 import { normalizeStopName } from '@/lib/tfnsw/trip'
 import {
   minutesUntil, effectiveTime, formatCountdown, formatClockTime,
@@ -41,24 +41,48 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const [showWalkMap, setShowWalkMap] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [orsWalkMins, setOrsWalkMins] = useState<number | null>(null)
+  // Manual override: true means "show the OTHER direction than the GPS-auto pick"
+  const [flipped, setFlipped] = useState(false)
   const { state: geoState } = useGeolocation()
 
   const gpsLat = geoState.status === 'granted' ? geoState.coords.lat : null
   const gpsLng = geoState.status === 'granted' ? geoState.coords.lng : null
 
+  // Auto-orient: whichever endpoint is closer to user's GPS becomes the
+  // current "source"; the other is the destination. Without GPS we default
+  // to endpointA so behaviour is stable across reloads. One-way trips
+  // (endpointB null — legacy or unresolved Home-tab saves) skip the flip.
+  // The `flipped` state is a manual override applied on top of the auto pick.
+  const { source, destination } = useMemo(() => {
+    if (!trip.endpointB) return { source: trip.endpointA, destination: null }
+    let auto: { source: TripEndpoint; destination: TripEndpoint }
+    if (gpsLat == null || gpsLng == null) {
+      auto = { source: trip.endpointA, destination: trip.endpointB }
+    } else {
+      const dA = haversineKm(gpsLat, gpsLng, trip.endpointA.lat, trip.endpointA.lng)
+      const dB = haversineKm(gpsLat, gpsLng, trip.endpointB.lat, trip.endpointB.lng)
+      auto = dA <= dB
+        ? { source: trip.endpointA, destination: trip.endpointB }
+        : { source: trip.endpointB, destination: trip.endpointA }
+    }
+    return flipped
+      ? { source: auto.destination, destination: auto.source }
+      : auto
+  }, [trip, gpsLat, gpsLng, flipped])
+
   // Immediate haversine estimate (~5 km/h walking) — works without any API
-  const haversineWalkMins = gpsLat && gpsLng && trip.lat && trip.lng
-    ? Math.round(haversineKm(gpsLat, gpsLng, trip.lat, trip.lng) * 12)
+  const haversineWalkMins = gpsLat && gpsLng && source.lat && source.lng
+    ? Math.round(haversineKm(gpsLat, gpsLng, source.lat, source.lng) * 12)
     : null
 
   // ORS gives a more accurate routed walk time; falls back to haversine if unavailable
   useEffect(() => {
-    if (!gpsLat || !gpsLng || !trip.lat || !trip.lng) return
-    fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${trip.lat}&toLng=${trip.lng}`)
+    if (!gpsLat || !gpsLng || !source.lat || !source.lng) return
+    fetch(`/api/walktime?fromLat=${gpsLat}&fromLng=${gpsLng}&toLat=${source.lat}&toLng=${source.lng}`)
       .then(r => r.json())
       .then(d => { if (typeof d.walkMinutes === 'number') setOrsWalkMins(d.walkMinutes) })
       .catch(() => {})
-  }, [gpsLat, gpsLng, trip.lat, trip.lng])
+  }, [gpsLat, gpsLng, source.lat, source.lng])
 
   const walkMins = orsWalkMins ?? haversineWalkMins
 
@@ -66,7 +90,7 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
   const actionableWalk = walkMins !== null && walkMins < 30 ? walkMins : 0
 
   const maxPastMinutes = trip.travelMinutes ?? 1
-  const url = `/api/departures?stopId=${encodeURIComponent(trip.stopId)}&maxPastMinutes=${maxPastMinutes}`
+  const url = `/api/departures?stopId=${encodeURIComponent(source.stopId)}&maxPastMinutes=${maxPastMinutes}`
   const { data, error, isLoading } = useSWR(url, fetchDepartures, { refreshInterval: 20_000 })
 
   const allDepartures = (data?.departures ?? []).filter((dep) => dep.mode === trip.mode)
@@ -103,20 +127,24 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <p className="text-xs text-gray-500 truncate">
-                {MODE_EMOJI[trip.mode] ?? '🚌'} {normalizeStopName(trip.stopName)}
+                {MODE_EMOJI[trip.mode] ?? '🚌'} {normalizeStopName(source.stopName)}
               </p>
               <h2 className="text-base font-semibold text-gray-900 leading-snug">
-                → {normalizeStopName(trip.userDestination ?? trip.destination)}
+                {destination ? (
+                  <>
+                    <span className="text-gray-400 font-normal mr-1" aria-label="Trip orients by your location">↔</span>
+                    {normalizeStopName(destination.stopName)}
+                  </>
+                ) : (
+                  <>→ {normalizeStopName(trip.terminalLabel ?? source.stopName)}</>
+                )}
               </h2>
               {trip.lineName && (
                 <p className="text-xs text-gray-400 mt-0.5 truncate">{trip.lineName}</p>
               )}
-              {trip.userDestination && (
-                <p className="text-xs text-gray-400 mt-0.5 truncate">via {trip.destination} service</p>
-              )}
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
-              {trip.lat && trip.lng && gpsLat && gpsLng ? (
+              {source.lat && source.lng && gpsLat && gpsLng ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowWalkMap(true) }}
                   className="text-base p-1 text-gray-400 active:text-tfnsw-blue"
@@ -125,6 +153,16 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
                   📍
                 </button>
               ) : null}
+              {trip.endpointB && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFlipped((v) => !v) }}
+                  className={`text-base p-1 ${flipped ? 'text-tfnsw-blue' : 'text-gray-400'} active:text-tfnsw-blue`}
+                  aria-label={flipped ? 'Use auto direction' : 'Reverse direction'}
+                  aria-pressed={flipped}
+                >
+                  ⇄
+                </button>
+              )}
               {confirmingRemove ? (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
@@ -211,13 +249,13 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
 
       {showTimetable && (
         <TimetableSheet
-          stopId={trip.stopId}
-          stopName={trip.stopName}
+          stopId={source.stopId}
+          stopName={source.stopName}
           serviceId={trip.serviceId}
-          destination={trip.userDestination ?? trip.destination}
+          destination={destination?.stopName ?? trip.terminalLabel ?? source.stopName}
           mode={trip.mode}
-          stopLat={trip.lat}
-          stopLng={trip.lng}
+          stopLat={source.lat}
+          stopLng={source.lng}
           gpsLat={gpsLat}
           gpsLng={gpsLng}
           travelMinutes={trip.travelMinutes}
@@ -225,11 +263,11 @@ function FavouriteTripCard({ trip, onRemove, onPrimaryMinsChange }: {
         />
       )}
 
-      {showWalkMap && gpsLat && gpsLng && trip.lat && trip.lng && (
+      {showWalkMap && gpsLat && gpsLng && source.lat && source.lng && (
         <WalkMap
-          stopLat={trip.lat}
-          stopLng={trip.lng}
-          stopName={normalizeStopName(trip.stopName)}
+          stopLat={source.lat}
+          stopLng={source.lng}
+          stopName={normalizeStopName(source.stopName)}
           userLat={gpsLat}
           userLng={gpsLng}
           onClose={() => setShowWalkMap(false)}

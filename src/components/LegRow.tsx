@@ -1,7 +1,7 @@
 'use client'
 
-import type { TripLeg } from '@/lib/types'
-import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import type { TripLeg, TripEndpoint } from '@/lib/types'
+import { useFavouriteTrips, tripPairId } from '@/hooks/useFavouriteTrips'
 import { normalizeStopName } from '@/lib/tfnsw/trip'
 
 const MODE_EMOJI: Record<string, string> = {
@@ -44,20 +44,37 @@ export function LegRow({ leg, fromStopId }: Props) {
     )
   }
 
-  // Use station-level stopId (from stop-search) when available; fall back to leg's platform-level stopId
-  const effectiveStopId = fromStopId ?? leg.stopId
-  const tripId = effectiveStopId
-    ? `${effectiveStopId}:${leg.destinationName}`
+  // Build a symmetric pair from the leg's origin and destination stops.
+  // Use station-level stopId for endpointA when available so saves dedupe
+  // against coord-based and Home-tab saves of the same boarding stop.
+  const endpointA: TripEndpoint | null = leg.stopId
+    ? {
+        stopId: fromStopId ?? leg.stopId,
+        stopName: normalizeStopName(leg.originName),
+        lat: leg.stopLat ?? 0,
+        lng: leg.stopLng ?? 0,
+      }
+    : null
+  const endpointB: TripEndpoint | null = leg.legDestinationStopId
+    ? {
+        stopId: leg.legDestinationStopId,
+        stopName: normalizeStopName(leg.destinationName),
+        lat: leg.legDestinationLat ?? 0,
+        lng: leg.legDestinationLng ?? 0,
+      }
+    : null
+  const tripId = endpointA && endpointB
+    ? tripPairId(endpointA, endpointB, leg.mode ?? 'unknown', leg.serviceId ?? '')
     : null
   const saved = tripId ? isFavourite(tripId) : false
   const emoji = MODE_EMOJI[leg.mode ?? 'unknown'] ?? '🚌'
 
   const handleSave = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!tripId || !leg.stopId) return
+    if (!tripId || !endpointA || !endpointB) return
     if (saved) {
       remove(tripId)
-    } else if (effectiveStopId) {
+    } else {
       const travelMinutes =
         leg.originDeparturePlanned && leg.destinationArrivalPlanned
           ? Math.round(
@@ -69,17 +86,13 @@ export function LegRow({ leg, fromStopId }: Props) {
 
       add({
         id: tripId,
-        stopId: effectiveStopId,
-        stopName: normalizeStopName(leg.originName),
-        serviceId: leg.serviceId!,
+        endpointA,
+        endpointB,
+        serviceId: leg.serviceId ?? '',
         lineName: leg.lineName,
-        destination: normalizeStopName(leg.destinationName),
         mode: leg.mode ?? 'unknown',
         walkMinutes: 0,
-        lat: leg.stopLat ?? 0,
-        lng: leg.stopLng ?? 0,
         travelMinutes,
-        userDestination: null,
       })
     }
   }

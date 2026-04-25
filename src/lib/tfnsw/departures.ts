@@ -146,6 +146,8 @@ interface RawTripLegStop {
   departureTimePlanned?: string
   departureTimeEstimated?: string
   arrivalTimePlanned?: string
+  arrivalTimeEstimated?: string
+  coord?: [number, number]  // EPSG:4326 [lat, lng]
   properties?: { platformName?: string }
 }
 
@@ -204,10 +206,13 @@ export async function getTripStops(
         plannedDeparture: s.departureTimePlanned ?? null,
         plannedArrival: s.arrivalTimePlanned ?? null,
         estimatedDeparture: s.departureTimeEstimated ?? null,
+        estimatedArrival: s.arrivalTimeEstimated ?? null,
         isCancelled: leg.realtimeStatus?.some((s) => s.includes('CANCELLED')) ?? false,
         platformName: s.properties?.platformName && s.properties.platformName !== '0'
           ? s.properties.platformName
           : null,
+        lat: s.coord?.[0] ?? null,
+        lng: s.coord?.[1] ?? null,
       }))
     }
   }

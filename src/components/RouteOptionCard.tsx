@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import type { RouteOption, TimetableResponse, FavouriteTrip } from '@/lib/types'
-import { useFavouriteTrips } from '@/hooks/useFavouriteTrips'
+import type { RouteOption, TimetableResponse, FavouriteTrip, TripEndpoint } from '@/lib/types'
+import { useFavouriteTrips, tripPairId } from '@/hooks/useFavouriteTrips'
 import { normalizeStopName } from '@/lib/tfnsw/trip'
 import { LegRow } from './LegRow'
 
@@ -61,48 +61,71 @@ interface Props {
   toLat: number
   toLng: number
   fromStopId?: string  // station-level stop ID for saving favourites
+  toStopId?: string    // station-level stop ID for the destination
+  toName?: string      // human-readable destination name
 }
 
-export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromStopId }: Props) {
+export function RouteOptionCard({ option, fromLat, fromLng, toLat, toLng, fromStopId, toStopId, toName }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [expandedEntryIdx, setExpandedEntryIdx] = useState<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<string>(() => todaySydney())
 
   const { isFavourite, toggle } = useFavouriteTrips()
 
-  // Derive favourite trip from the first transit leg of the sample journey
+  // Derive favourite trip from the journey's overall endpoints. The user
+  // typed "From → To" in the planner, so endpointA is the boarding stop and
+  // endpointB is their actual alighting stop — not the first leg's terminal,
+  // which would just be an interchange for multi-leg journeys.
   const firstTransitLeg = option.sampleJourney.legs.find((l) => !l.isWalk) ?? null
+  const lastTransitLeg = option.sampleJourney.legs.filter((l) => !l.isWalk).at(-1) ?? null
   const firstWalkLeg = option.sampleJourney.legs.find((l) => l.isWalk) ?? null
   const walkMinutes = firstWalkLeg
     ? Math.round((firstWalkLeg.walkDurationSeconds ?? firstWalkLeg.durationSeconds) / 60)
     : 0
-  // Use station-level stopId for deduplication and departure fetching
-  const effectiveStopId = fromStopId ?? firstTransitLeg?.stopId ?? null
-  const tripId = effectiveStopId && firstTransitLeg
-    ? `${effectiveStopId}:${firstTransitLeg.destinationName}`
+
+  // Station-level stopId preferred for both endpoints (matches deduplication
+  // across coord-based and stop-based saves); fall back to the leg's
+  // platform-level stopId when the user didn't pick a specific station.
+  const endpointA: TripEndpoint | null = firstTransitLeg
+    ? {
+        stopId: fromStopId ?? firstTransitLeg.stopId ?? '',
+        stopName: normalizeStopName(firstTransitLeg.originName),
+        lat: firstTransitLeg.stopLat ?? 0,
+        lng: firstTransitLeg.stopLng ?? 0,
+      }
     : null
+  const endpointB: TripEndpoint | null = lastTransitLeg
+    ? {
+        stopId: toStopId ?? lastTransitLeg.legDestinationStopId ?? '',
+        stopName: normalizeStopName(toName ?? lastTransitLeg.destinationName),
+        lat: lastTransitLeg.legDestinationLat ?? toLat,
+        lng: lastTransitLeg.legDestinationLng ?? toLng,
+      }
+    : null
+
   const favouriteTrip: FavouriteTrip | null =
-    tripId && effectiveStopId && firstTransitLeg
+    endpointA && endpointB && endpointA.stopId && endpointB.stopId && firstTransitLeg
       ? {
-          id: tripId,
-          stopId: effectiveStopId,
-          stopName: normalizeStopName(firstTransitLeg.originName),
-          serviceId: firstTransitLeg.serviceId!,
+          id: tripPairId(
+            endpointA,
+            endpointB,
+            firstTransitLeg.mode ?? 'unknown',
+            firstTransitLeg.serviceId ?? '',
+          ),
+          endpointA,
+          endpointB,
+          serviceId: firstTransitLeg.serviceId ?? '',
           lineName: firstTransitLeg.lineName,
-          destination: normalizeStopName(firstTransitLeg.destinationName),
           mode: firstTransitLeg.mode ?? 'unknown',
           walkMinutes,
-          lat: firstTransitLeg.stopLat ?? 0,
-          lng: firstTransitLeg.stopLng ?? 0,
           travelMinutes:
-            firstTransitLeg.originDeparturePlanned && firstTransitLeg.destinationArrivalPlanned
+            firstTransitLeg.originDeparturePlanned && lastTransitLeg?.destinationArrivalPlanned
               ? Math.round(
-                  (new Date(firstTransitLeg.destinationArrivalPlanned).getTime() -
+                  (new Date(lastTransitLeg.destinationArrivalPlanned).getTime() -
                     new Date(firstTransitLeg.originDeparturePlanned).getTime()) /
                     60_000
                 )
               : null,
-          userDestination: null,
         }
       : null
 

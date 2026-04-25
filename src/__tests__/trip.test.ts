@@ -97,38 +97,38 @@ describe('journeyFingerprint', () => {
 
   it('produces mode:serviceId pairs joined by |', () => {
     const journey = makeJourney([
-      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bondi Junction', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
+      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bondi Junction', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
     ])
     expect(journeyFingerprint(journey)).toBe('train:Central:Bondi Junction')
   })
 
   it('strips suburb suffix from stop names', () => {
     const journey = makeJourney([
-      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central Station, Sydney', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Chatswood Station, Chatswood', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
+      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 1200, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central Station, Sydney', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Chatswood Station, Chatswood', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
     ])
     expect(journeyFingerprint(journey)).toBe('train:Central Station:Chatswood Station')
   })
 
   it('joins multiple transit legs with |', () => {
     const journey = makeJourney([
-      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 600, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Sydenham', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
-      { isWalk: true,  mode: null,    serviceId: null, durationSeconds: 120,  walkDurationSeconds: 120, lineName: null, isCancelled: false, originName: 'Sydenham', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bus Stop', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
-      { isWalk: false, mode: 'bus',   serviceId: '380', durationSeconds: 600, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Bus Stop', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bondi Beach', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
+      { isWalk: false, mode: 'train', serviceId: 'T4', durationSeconds: 600, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Central', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Sydenham', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
+      { isWalk: true,  mode: null,    serviceId: null, durationSeconds: 120,  walkDurationSeconds: 120, lineName: null, isCancelled: false, originName: 'Sydenham', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bus Stop', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
+      { isWalk: false, mode: 'bus',   serviceId: '380', durationSeconds: 600, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Bus Stop', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Bondi Beach', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
     ])
     expect(journeyFingerprint(journey)).toBe('train:Central:Sydenham|bus:Bus Stop:Bondi Beach')
   })
 
   it('excludes walk legs from the fingerprint', () => {
     const journey = makeJourney([
-      { isWalk: true, mode: null, serviceId: null, durationSeconds: 300, walkDurationSeconds: 300, lineName: null, isCancelled: false, originName: 'Start', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Stop', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
-      { isWalk: false, mode: 'metro', serviceId: 'M1', durationSeconds: 900, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Stop', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Dest', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
+      { isWalk: true, mode: null, serviceId: null, durationSeconds: 300, walkDurationSeconds: 300, lineName: null, isCancelled: false, originName: 'Start', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Stop', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
+      { isWalk: false, mode: 'metro', serviceId: 'M1', durationSeconds: 900, walkDurationSeconds: null, lineName: null, isCancelled: false, originName: 'Stop', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'Dest', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
     ])
     expect(journeyFingerprint(journey)).toBe('metro:Stop:Dest')
   })
 
   it('returns empty string for a walk-only journey', () => {
     const journey = makeJourney([
-      { isWalk: true, mode: null, serviceId: null, durationSeconds: 600, walkDurationSeconds: 600, lineName: null, isCancelled: false, originName: 'A', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'B', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null },
+      { isWalk: true, mode: null, serviceId: null, durationSeconds: 600, walkDurationSeconds: 600, lineName: null, isCancelled: false, originName: 'A', originDeparturePlanned: null, originDepartureEstimated: null, platformName: null, destinationName: 'B', destinationArrivalPlanned: null, stopId: null, stopLat: null, stopLng: null, legDestination: null, legDestinationStopId: null, legDestinationLat: null, legDestinationLng: null },
     ])
     expect(journeyFingerprint(journey)).toBe('')
   })

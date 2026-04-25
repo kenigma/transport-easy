@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import useSWR from 'swr'
 import type { Departure, StopOnRoute, TransportMode } from '@/lib/types'
 import { normalizeStopName } from '@/lib/tfnsw/trip'
+import { useCountdown } from '@/hooks/useCountdown'
 import { VehicleMap } from './VehicleMap'
 import { useState } from 'react'
 
@@ -35,6 +36,8 @@ export function TripStopsSheet({
   departure, boardingStopId, serviceId, destination, mode,
   stopLat, stopLng, stopName, onClose,
 }: Props) {
+  // Tick every 10s so the live "next stop" cursor advances without re-fetching
+  useCountdown(10_000)
   const [showVehicleMap, setShowVehicleMap] = useState(false)
 
   const url = departure.terminalStopId
@@ -46,6 +49,22 @@ export function TripStopsSheet({
 
   // Find boarding stop index to highlight it
   const boardingIdx = stops.findIndex((s) => s.stopId === boardingStopId)
+
+  // Live "next stop" cursor: first non-cancelled stop whose arrival time is
+  // still in the future. EFA returns estimated arrivals when realtime is
+  // available, so this advances naturally as the train progresses. Falls back
+  // through arrival → departure (planned/estimated) so we still get a cursor
+  // for terminal/origin stops where one of the two is null.
+  const nowMs = Date.now()
+  const tickTime = (s: StopOnRoute): number | null => {
+    const t = s.estimatedArrival ?? s.plannedArrival ?? s.estimatedDeparture ?? s.plannedDeparture
+    return t ? new Date(t).getTime() : null
+  }
+  const nextIdx = stops.findIndex((s) => {
+    if (s.isCancelled) return false
+    const t = tickTime(s)
+    return t != null && t > nowMs
+  })
 
   // Close on Escape
   useEffect(() => {
@@ -130,23 +149,33 @@ export function TripStopsSheet({
               <div className="relative">
                 {stops.map((stop, i) => {
                   const isBoarding = i === boardingIdx
-                  const isPast = boardingIdx >= 0 && i < boardingIdx
+                  // Time-based: stops the train has already passed (cursor at nextIdx)
+                  const isPast = nextIdx >= 0 ? i < nextIdx : true
+                  const isNext = i === nextIdx
                   const time = stop.estimatedDeparture ?? stop.plannedDeparture ?? stop.plannedArrival
                   const hasLive = !!stop.estimatedDeparture
                   const isLast = i === stops.length - 1
 
+                  // Dot/track styling: live "next stop" trumps boarding only
+                  // for the dot's pulse — boarding still wins on track colour
+                  // for users who want to see where they're getting on.
+                  const dotClass = isBoarding
+                    ? 'border-blue-600 bg-blue-600'
+                    : isNext
+                      ? 'border-blue-500 bg-blue-500 animate-pulse'
+                      : isPast
+                        ? 'border-gray-300 bg-gray-300'
+                        : 'border-blue-400 bg-white'
+
                   return (
                     <div
                       key={`${stop.stopId}-${i}`}
-                      className={`flex items-stretch gap-3 px-4 ${isBoarding ? 'bg-blue-50' : ''}`}
+                      className={`flex items-stretch gap-3 px-4 ${isBoarding ? 'bg-blue-50' : isNext ? 'bg-blue-50/40' : ''}`}
                     >
                       {/* Timeline column */}
                       <div className="flex flex-col items-center w-5 flex-shrink-0">
                         <div className={`w-px flex-1 ${i === 0 ? 'bg-transparent' : isPast ? 'bg-gray-200' : 'bg-blue-300'}`} />
-                        <div className={`
-                          w-2.5 h-2.5 rounded-full border-2 flex-shrink-0 my-0.5
-                          ${isBoarding ? 'border-blue-600 bg-blue-600' : isPast ? 'border-gray-300 bg-gray-300' : 'border-blue-400 bg-white'}
-                        `} />
+                        <div className={`w-2.5 h-2.5 rounded-full border-2 flex-shrink-0 my-0.5 ${dotClass}`} />
                         <div className={`w-px flex-1 ${isLast ? 'bg-transparent' : isPast ? 'bg-gray-200' : 'bg-blue-300'}`} />
                       </div>
 
@@ -155,12 +184,17 @@ export function TripStopsSheet({
                         <div className="min-w-0">
                           <p className={`text-sm truncate ${
                             isBoarding ? 'font-semibold text-blue-700'
+                            : isNext ? 'font-semibold text-blue-700'
                             : isPast ? 'text-gray-400'
                             : 'text-gray-900'
                           }`}>
                             {normalizeStopName(stop.stopName)}
-                            {isBoarding && (
-                              <span className="ml-1.5 text-xs font-normal text-blue-500">Board here</span>
+                            {(isBoarding || isNext) && (
+                              <span className="ml-1.5 text-xs font-normal text-blue-500">
+                                {isBoarding && 'Board here'}
+                                {isBoarding && isNext && ' · '}
+                                {isNext && 'Next'}
+                              </span>
                             )}
                           </p>
                           {stop.platformName && (
@@ -176,6 +210,7 @@ export function TripStopsSheet({
                           <div className="text-right flex-shrink-0 ml-3">
                             <p className={`text-sm tabular-nums ${
                               isBoarding ? 'font-semibold text-blue-700'
+                              : isNext ? 'font-semibold text-blue-700'
                               : isPast ? 'text-gray-400'
                               : 'text-gray-700'
                             }`}>

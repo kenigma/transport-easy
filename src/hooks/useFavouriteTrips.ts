@@ -1,21 +1,103 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { FavouriteTrip } from '@/lib/types'
+import type { FavouriteTrip, TripEndpoint, TransportMode } from '@/lib/types'
 
 const STORAGE_KEY = 'transport-easy:favourite-trips'
 const SYNC_EVENT = 'favourite-trips-changed'
 
+// The legacy single-stop shape we migrate from. Fields kept loose intentionally —
+// localStorage may carry partial data from any historical version.
+interface LegacyFavouriteTrip {
+  id?: string
+  stopId?: string
+  stopName?: string
+  lat?: number
+  lng?: number
+  serviceId?: string
+  lineName?: string | null
+  destination?: string
+  mode?: TransportMode
+  walkMinutes?: number
+  travelMinutes?: number | null
+  // Already-migrated entries carry the new pair shape:
+  endpointA?: TripEndpoint
+  endpointB?: TripEndpoint | null
+  terminalLabel?: string | null
+}
+
+/**
+ * Builds the canonical id for a trip pair. When both endpoints are known we
+ * sort the stopIds so A↔B and B↔A collapse to the same record. The mode +
+ * serviceId variant lets the same endpoint pair coexist as distinct favourites
+ * across modes (e.g. T1 train vs M1 metro between Chatswood and Town Hall).
+ * When only one endpoint is known (legacy/unresolved Home-tab saves) we fall
+ * back to the single-stop variant.
+ */
+export function tripPairId(
+  a: TripEndpoint,
+  b: TripEndpoint | null,
+  mode: TransportMode,
+  serviceId: string,
+): string {
+  const pair = b ? [a.stopId, b.stopId].sort().join(':') : a.stopId
+  return `${pair}:${mode}:${serviceId}`
+}
+
+function migrate(t: LegacyFavouriteTrip): FavouriteTrip | null {
+  // Already-new shape: trust endpointA, normalise endpointB undefined → null.
+  if (t.endpointA) {
+    const endpointA = t.endpointA
+    const endpointB = t.endpointB ?? null
+    const mode = (t.mode ?? 'unknown') as TransportMode
+    const serviceId = t.serviceId ?? ''
+    return {
+      id: tripPairId(endpointA, endpointB, mode, serviceId),
+      endpointA,
+      endpointB,
+      serviceId,
+      lineName: t.lineName ?? null,
+      mode,
+      walkMinutes: t.walkMinutes ?? 0,
+      travelMinutes: t.travelMinutes ?? null,
+      terminalLabel: t.terminalLabel ?? null,
+    }
+  }
+  // Legacy single-stop shape — promote the boarding stop to endpointA, leave
+  // endpointB null. Auto-orient is disabled for this trip until the user
+  // re-saves it via the Plan tab (which captures both endpoints) or via the
+  // updated Home-tab save flow that resolves the terminal name.
+  if (!t.stopId || !t.stopName) return null
+  const endpointA: TripEndpoint = {
+    stopId: t.stopId,
+    stopName: t.stopName,
+    lat: t.lat ?? 0,
+    lng: t.lng ?? 0,
+  }
+  const mode = (t.mode ?? 'unknown') as TransportMode
+  const serviceId = t.serviceId ?? ''
+  return {
+    id: tripPairId(endpointA, null, mode, serviceId),
+    endpointA,
+    endpointB: null,
+    serviceId,
+    lineName: t.lineName ?? null,
+    mode,
+    walkMinutes: t.walkMinutes ?? 0,
+    travelMinutes: t.travelMinutes ?? null,
+    // Preserve the original line-terminal name for display, since legacy
+    // entries didn't store endpointB coords and reverse-orient is disabled.
+    terminalLabel: t.destination ?? null,
+  }
+}
+
 function load(): FavouriteTrip[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    const parsed: FavouriteTrip[] = raw ? JSON.parse(raw) : []
-    // Migrate old 3-part IDs (stopId:serviceId:destination) to 2-part (stopId:destination)
-    const migrated = parsed.map((t) => {
-      const parts = t.id.split(':')
-      const newId = parts.length === 3 ? `${parts[0]}:${parts[2]}` : t.id
-      return { ...t, id: newId, walkMinutes: t.walkMinutes ?? 0, lat: t.lat ?? 0, lng: t.lng ?? 0, travelMinutes: t.travelMinutes ?? null, userDestination: t.userDestination ?? null }
-    })
+    const parsed: LegacyFavouriteTrip[] = raw ? JSON.parse(raw) : []
+    const migrated = parsed
+      .map(migrate)
+      .filter((t): t is FavouriteTrip => t !== null)
     // Deduplicate by id (keep first occurrence)
     const seen = new Set<string>()
     return migrated.filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true })

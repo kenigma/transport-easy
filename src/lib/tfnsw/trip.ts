@@ -82,9 +82,12 @@ function parseLeg(leg: RawLeg): TripLeg {
   const platform = leg.origin?.properties?.platformName ?? null
 
   // Coords: TfNSW returns [lat, lng] with EPSG:4326
-  const coord = leg.origin?.coord
-  const stopLat = coord ? coord[0] : null
-  const stopLng = coord ? coord[1] : null
+  const originCoord = leg.origin?.coord
+  const stopLat = originCoord ? originCoord[0] : null
+  const stopLng = originCoord ? originCoord[1] : null
+  const destCoord = leg.destination?.coord
+  const destLat = destCoord ? destCoord[0] : null
+  const destLng = destCoord ? destCoord[1] : null
 
   return {
     isWalk: walk,
@@ -107,6 +110,9 @@ function parseLeg(leg: RawLeg): TripLeg {
     stopLat: walk ? null : stopLat,
     stopLng: walk ? null : stopLng,
     legDestination: walk ? null : (transport.destination?.name ?? null),
+    legDestinationStopId: walk ? null : (leg.destination?.id ?? null),
+    legDestinationLat: walk ? null : destLat,
+    legDestinationLng: walk ? null : destLng,
   }
 }
 
