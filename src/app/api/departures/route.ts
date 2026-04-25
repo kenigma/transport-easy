@@ -31,7 +31,10 @@ export async function GET(req: NextRequest) {
 
   if (!departures) {
     try {
-      departures = await getDepartures(stopId, 40, maxPastMinutes, futureMinutes)
+      // extended timetable view filters by serviceId client-side, so we need
+      // a much larger pool to survive the filter at busy multi-mode stops.
+      const sliceBudget = extended ? 200 : 40
+      departures = await getDepartures(stopId, sliceBudget, maxPastMinutes, futureMinutes)
       cacheSet(cacheKey, departures, CACHE_TTL_MS)
     } catch (err) {
       console.error('[/api/departures]', err)

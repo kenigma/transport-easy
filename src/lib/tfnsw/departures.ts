@@ -72,6 +72,13 @@ export async function getDepartures(
     : now
   const { itdDate, itdTime } = getSydneyItdParams(queryTime)
 
+  // TfNSW defaults to ~40 events. At busy multi-mode stops (Chatswood: 20 bus +
+  // 10 metro + 8 train events in a 35-min window), the budget gets exhausted
+  // before we have enough of any single service. Request 5× our slice budget,
+  // floored at 50, so a caller asking for the full extended window still gets
+  // adequate per-service coverage after caller-side filtering.
+  const limit = Math.max(50, maxDepartures * 5)
+
   const data = await tfnswFetch('/tp/departure_mon', {
     outputFormat: 'rapidJSON',
     coordOutputFormat: 'EPSG:4326',
@@ -84,6 +91,7 @@ export async function getDepartures(
     itdTime,
     TfNSWDM: 'true',
     version: '10.2.2.48',
+    limit: String(limit),
   }) as { stopEvents?: RawStopEvent[] }
 
   const events = data?.stopEvents ?? []
